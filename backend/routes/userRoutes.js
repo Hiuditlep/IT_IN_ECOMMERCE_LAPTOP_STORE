@@ -43,11 +43,7 @@ router.post("/register", async (req, res) => {
       });
     }
 
-    const role =
-      rawInput.toLowerCase() === "admin" ||
-      finalEmail.toLowerCase() === "admin@gmail.com"
-        ? "admin"
-        : "user";
+    const role = "user";
 
     const insertQuery = `
       INSERT INTO users (full_name, email, password_hash, phone, address, role)
