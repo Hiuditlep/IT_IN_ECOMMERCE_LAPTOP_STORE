@@ -1,6 +1,7 @@
 const express = require("express");
 const router = express.Router();
 const pool = require("../db");
+const { CartError, normalizeItems, priceItems } = require("../services/cart");
 
 // Lấy danh sách đơn hàng (Admin)
 router.get("/", async (req, res) => {
@@ -64,47 +65,39 @@ router.post("/", async (req, res) => {
     phone,
     shipping_address,
     address,
-    total_amount,
-    total,
     items,
   } = req.body;
 
   const finalPhone = phone || customerInfo?.phone || "";
   const finalAddress =
     shipping_address || address || customerInfo?.address || "";
-  const finalTotal = Number(total_amount || total || 0);
   const rawUserId = userId || user_id;
   const validUserId = isNaN(parseInt(rawUserId)) ? null : parseInt(rawUserId);
 
-  if (!items || !Array.isArray(items) || items.length === 0) {
-    return res.status(400).json({ success: false, message: "Giỏ hàng trống!" });
-  }
+  let normalized;
+  try { normalized = normalizeItems(items); }
+  catch (error) { return res.status(400).json({ success: false, message: error.message }); }
 
   const client = await pool.connect();
   try {
     await client.query("BEGIN");
+    const pricedCart = await priceItems(client, normalized);
 
     // 1. Lưu vào bảng orders (order_id tự tăng theo SERIAL)
     const orderRes = await client.query(
       `INSERT INTO orders (user_id, total_amount, status, shipping_address, phone)
        VALUES ($1, $2, $3, $4, $5)
        RETURNING *`,
-      [validUserId, finalTotal, "Chờ duyệt", finalAddress, finalPhone],
+      [validUserId, pricedCart.total_amount, "Chờ duyệt", finalAddress, finalPhone],
     );
     const newOrder = orderRes.rows[0];
 
     // 2. Lưu từng sản phẩm vào bảng order_items
-    for (const item of items) {
-      const pId = parseInt(item.product_id || item.id);
-      const qty = Number(item.quantity || item.qty || 1);
-      const unitPrice = Number(
-        item.unit_price || item.price_vnd || item.price || 0,
-      );
-
+    for (const item of pricedCart.items) {
       await client.query(
         `INSERT INTO order_items (order_id, product_id, quantity, unit_price)
          VALUES ($1, $2, $3, $4)`,
-        [newOrder.order_id, isNaN(pId) ? null : pId, qty, unitPrice],
+        [newOrder.order_id, item.product_id, item.quantity, item.unit_price],
       );
     }
 
@@ -117,7 +110,9 @@ router.post("/", async (req, res) => {
   } catch (error) {
     await client.query("ROLLBACK");
     console.error("Lỗi tạo đơn hàng:", error);
-    res.status(500).json({ success: false, message: error.message });
+    res.status(error instanceof CartError ? 400 : 500).json({
+      success: false, message: error instanceof CartError ? error.message : "Lỗi tạo đơn hàng",
+    });
   } finally {
     client.release();
   }

@@ -40,10 +40,7 @@ export default function Auth({ setUser }) {
 
       if (res.ok && data.success) {
         alert("Đăng nhập thành công!");
-        const role =
-          data.user?.role ||
-          (username.toLowerCase() === "admin" ? "admin" : "user");
-        const userData = { ...data.user, role };
+        const userData = data.user;
         setUser(userData);
         localStorage.setItem("user", JSON.stringify(userData));
         navigate(-1);
@@ -74,10 +71,7 @@ export default function Auth({ setUser }) {
 
       if (res.ok && data.success) {
         alert("Đăng ký thành công!");
-        const role =
-          data.user?.role ||
-          (username.toLowerCase() === "admin" ? "admin" : "user");
-        const userData = { ...data.user, role };
+        const userData = data.user;
         setUser(userData);
         localStorage.setItem("user", JSON.stringify(userData));
         navigate(-1);
