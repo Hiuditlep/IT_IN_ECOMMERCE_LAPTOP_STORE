@@ -1,19 +1,15 @@
-import { useState, useEffect } from "react";
-import {
-  BrowserRouter,
-  Routes,
-  Route,
-  Link,
-  useNavigate,
-} from "react-router-dom";
+import { useEffect, useState } from "react";
+import { BrowserRouter, Link, NavLink, Route, Routes, useLocation } from "react-router-dom";
+import { StoreProvider, useStore } from "./store";
 
-// COMPONENTS BÊN TRONG
-import MegaMenu from "./components/MegaMenu";
+import CommandPalette from "./components/CommandPalette";
+import { CartDrawer, CompareDock, Toasts } from "./components/Overlays";
+import { CartIcon, CompareIcon, MoonIcon, SearchIcon, SunIcon, UserIcon } from "./components/Icons";
 
-// PAGES
 import Home from "./pages/Home";
 import Detail from "./pages/Detail";
 import Cart from "./pages/Cart";
+import Compare from "./pages/Compare";
 import Auth from "./pages/Auth";
 import Checkout from "./pages/Checkout";
 import Admin from "./pages/Admin";
@@ -21,319 +17,168 @@ import Profile from "./pages/Profile";
 import MyOrders from "./pages/MyOrders";
 import SearchPage from "./pages/SearchPage";
 
-function AppContent() {
-  const [cart, setCart] = useState([]);
-  const [searchInput, setSearchInput] = useState("");
-  const navigate = useNavigate();
+const iconBtn = "relative rounded-full p-2.5 text-ink/70 transition hover:bg-ink/5 hover:text-ink";
 
-  const [user, setUser] = useState(
-    () => JSON.parse(localStorage.getItem("user")) || null,
-  );
-
-  // === STATE CHO TÍNH NĂNG GỢI Ý ===
-  const [searchSuggestions, setSearchSuggestions] = useState([]);
-  const [showSuggestions, setShowSuggestions] = useState(false);
+function Header() {
+  const { user, setUser, cartCount, setCartOpen, setPaletteOpen, compareIds, toast, theme, toggleTheme } = useStore();
+  const [scrolled, setScrolled] = useState(false);
+  const isMac = typeof navigator !== "undefined" && /mac/i.test(navigator.platform);
 
   useEffect(() => {
-    if (searchInput.trim().length > 0) {
-      fetch(`http://localhost:5000/api/products?search=${searchInput.trim()}`)
-        .then((res) => res.json())
-        .then((data) => {
-          setSearchSuggestions(data.slice(0, 4));
-        });
-    } else {
-      setSearchSuggestions([]);
-    }
-  }, [searchInput]);
+    const onScroll = () => setScrolled(window.scrollY > 8);
+    onScroll();
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, []);
 
-  const handleLogout = () => {
-    setUser(null);
-    localStorage.removeItem("user");
-  };
-
-  const addToCart = (product) => {
-    if (!user) {
-      alert("Vui lòng đăng nhập để thêm sản phẩm vào giỏ hàng!");
-      navigate("/auth");
-      return;
-    }
-    if (product.stock_quantity <= 0) {
-      alert("Sản phẩm này đã tạm hết hàng!");
-      return;
-    }
-
-    const existingItem = cart.find((item) => item.id === product.id);
-    if (existingItem && existingItem.qty >= product.stock_quantity) {
-      alert(`Rất tiếc, kho chỉ còn tối đa ${product.stock_quantity} sản phẩm!`);
-      return;
-    }
-
-    setCart((prevCart) => {
-      const itemInCart = prevCart.find((item) => item.id === product.id);
-      if (itemInCart) {
-        return prevCart.map((item) =>
-          item.id === product.id ? { ...item, qty: item.qty + 1 } : item,
-        );
-      }
-      return [...prevCart, { ...product, qty: 1 }];
-    });
-    alert("Đã thêm vào giỏ hàng!");
-  };
-
-  const updateQuantity = (id, amount) => {
-    const itemToUpdate = cart.find((item) => item.id === id);
-    if (itemToUpdate) {
-      const newQty = itemToUpdate.qty + amount;
-      if (newQty < 1) return;
-      if (newQty > itemToUpdate.stock_quantity) {
-        alert(`Kho chỉ còn ${itemToUpdate.stock_quantity} sản phẩm!`);
-        return;
-      }
-      setCart((prevCart) =>
-        prevCart.map((item) =>
-          item.id === id ? { ...item, qty: newQty } : item,
-        ),
-      );
-    }
-  };
-
-  const removeFromCart = (id) =>
-    setCart((prevCart) => prevCart.filter((item) => item.id !== id));
-  const clearCart = () => setCart([]);
-
-  const handleSearchSubmit = (e) => {
-    e.preventDefault();
-    if (searchInput.trim() !== "") {
-      setShowSuggestions(false);
-      navigate(`/search?q=${searchInput.trim()}`);
-    }
-  };
+  const navCls = ({ isActive }) =>
+    `rounded-full px-3 py-1.5 text-sm font-medium transition ${isActive ? "bg-ink/[.07] text-ink" : "text-ink/55 hover:text-ink"}`;
 
   return (
-    <div className="min-h-screen bg-gray-100 font-sans w-full">
-      <header className="bg-red-600 text-white p-3 shadow-md sticky top-0 z-50 w-full">
-        <div className="w-full px-4 md:px-8 mx-auto flex justify-between items-center gap-6 h-full">
-          {/* CỤM 1: LOGO & DANH MỤC */}
-          <div className="flex items-center gap-4">
-            <Link
-              to="/"
-              className="flex items-center justify-center hover:opacity-80 transition-opacity h-full"
-            >
-              <img
-                src="/Logo.png"
-                alt="Logo"
-                className="h-10 w-auto object-contain"
-              />
-            </Link>
+    <header
+      className={`sticky top-0 z-50 w-full transition-colors ${scrolled ? "border-b border-ink/[.06] bg-paper/80 backdrop-blur-xl" : ""}`}
+    >
+      <div className="mx-auto flex h-16 max-w-7xl items-center gap-3 px-4 md:gap-5 md:px-8">
+        <Link to="/" className="flex shrink-0 items-center gap-2.5">
+          <span className="flex h-9 w-9 items-center justify-center overflow-hidden rounded-xl bg-white ring-1 ring-ink/10">
+            <img src="/Logo.png" alt="" className="h-full w-full scale-[1.55] object-cover object-[50%_32%]" />
+          </span>
+          <span className="hidden font-display text-[17px] font-bold tracking-tight sm:block">
+            UseYour<span className="text-accent">Mind</span>
+          </span>
+        </Link>
 
-            {/* Gọi Component MegaMenu đã tách ra */}
-            <MegaMenu />
-          </div>
+        <nav className="hidden items-center gap-1 lg:flex">
+          <NavLink to="/" end className={navCls}>Khám phá</NavLink>
+          <NavLink to="/compare" className={navCls}>
+            So sánh{compareIds.length ? ` · ${compareIds.length}` : ""}
+          </NavLink>
+        </nav>
 
-          {/* CỤM 2: THANH TÌM KIẾM ĐƯỢC KÉO TO RA */}
-          <form
-            onSubmit={handleSearchSubmit}
-            className="flex-1 w-full max-w-3xl relative flex flex-col"
-          >
-            <div className="relative w-full">
-              <input
-                type="text"
-                placeholder="Nhập tên laptop cần tìm..."
-                className="w-full text-black px-4 py-2.5 rounded-full focus:outline-none shadow-inner pr-12 text-sm border focus:border-red-400 transition"
-                value={searchInput}
-                onChange={(e) => setSearchInput(e.target.value)}
-                onFocus={() => setShowSuggestions(true)}
-                onBlur={() => setTimeout(() => setShowSuggestions(false), 200)}
-              />
-              <button
-                type="submit"
-                className="absolute right-1 top-1/2 -translate-y-1/2 p-1.5 bg-gray-100 hover:bg-gray-200 rounded-full text-gray-500 hover:text-red-600 transition"
-              >
-                <svg
-                  className="w-5 h-5"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth="2"
-                    d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-                  ></path>
-                </svg>
+        <button
+          onClick={() => setPaletteOpen(true)}
+          className="flex h-10 min-w-0 flex-1 items-center gap-3 rounded-full border border-ink/10 bg-surface px-4 text-left text-sm text-ink/45 transition hover:border-ink/25 md:ml-auto md:max-w-md"
+        >
+          <SearchIcon className="h-4 w-4 shrink-0" />
+          <span className="truncate">Tìm laptop…</span>
+          <kbd className="ml-auto hidden shrink-0 rounded-md border border-ink/10 px-1.5 py-0.5 font-mono text-[11px] sm:block">
+            {isMac ? "⌘" : "Ctrl"} K
+          </kbd>
+        </button>
+
+        <div className="flex shrink-0 items-center">
+          <button onClick={toggleTheme} className={iconBtn} aria-label={theme === "dark" ? "Chế độ sáng" : "Chế độ tối"} title={theme === "dark" ? "Chế độ sáng" : "Chế độ tối"}>
+            {theme === "dark" ? <SunIcon /> : <MoonIcon />}
+          </button>
+
+          <Link to="/compare" className={`${iconBtn} lg:hidden`} aria-label="So sánh">
+            <CompareIcon />
+            {compareIds.length > 0 && <span className="absolute right-1.5 top-1.5 h-2 w-2 rounded-full bg-mind-500" />}
+          </Link>
+
+          {user ? (
+            <div className="group relative">
+              <button className="flex items-center rounded-full p-1.5" aria-haspopup="menu" aria-label="Tài khoản">
+                <span className="flex h-8 w-8 items-center justify-center rounded-full bg-mind-600 text-sm font-bold text-white">
+                  {(user.full_name || user.username || "U").trim().charAt(0).toUpperCase()}
+                </span>
               </button>
-            </div>
-
-            {/* BẢNG SẢN PHẨM ĐỀ XUẤT */}
-            {showSuggestions && searchInput.trim() !== "" && (
-              <div className="absolute top-full left-0 right-0 bg-white shadow-xl rounded-lg mt-2 border border-gray-200 overflow-hidden text-black z-50">
-                <div className="p-3 text-sm font-semibold text-gray-600 bg-gray-50 border-b">
-                  Sản phẩm đề xuất
+              <div className="invisible absolute right-0 top-full w-52 translate-y-1 pt-2 opacity-0 transition group-focus-within:visible group-focus-within:translate-y-0 group-focus-within:opacity-100 group-hover:visible group-hover:translate-y-0 group-hover:opacity-100">
+                <div className="rounded-2xl border border-ink/[.07] bg-surface p-1.5 shadow-xl" role="menu">
+                  <p className="truncate px-3 py-2 text-xs text-ink/45">{user.email || user.username}</p>
+                  <Link to="/profile" className="block rounded-xl px-3 py-2 text-sm hover:bg-ink/5">Tài khoản</Link>
+                  <Link to="/my-orders" className="block rounded-xl px-3 py-2 text-sm hover:bg-ink/5">Đơn mua</Link>
+                  {user.role === "admin" && (
+                    <Link to="/admin" className="block rounded-xl px-3 py-2 text-sm font-semibold text-accent hover:bg-ink/5">Quản trị</Link>
+                  )}
+                  <button
+                    onClick={() => {
+                      setUser(null);
+                      toast("Đã đăng xuất");
+                    }}
+                    className="block w-full rounded-xl px-3 py-2 text-left text-sm text-danger hover:bg-ink/5"
+                  >
+                    Đăng xuất
+                  </button>
                 </div>
-                {searchSuggestions.length > 0 ? (
-                  <ul className="max-h-80 overflow-y-auto">
-                    {searchSuggestions.map((p) => (
-                      <li
-                        key={p.id}
-                        className="hover:bg-gray-50 border-b last:border-b-0 transition"
-                      >
-                        <div
-                          onClick={() => {
-                            navigate(`/product/${p.id}`);
-                            setSearchInput("");
-                            setShowSuggestions(false);
-                          }}
-                          className="flex gap-4 p-3 cursor-pointer items-center"
-                        >
-                          <img
-                            src={p.image_url || p.image}
-                            alt={p.name}
-                            className="w-12 h-12 object-contain rounded"
-                          />
-                          <div className="flex-1">
-                            <p className="text-sm font-semibold text-gray-800 line-clamp-1">
-                              {p.name}
-                            </p>
-                            <p className="text-red-600 font-bold text-sm mt-0.5">
-                              {(p.price_vnd || p.price || 0).toLocaleString(
-                                "vi-VN",
-                              )}{" "}
-                              đ
-                            </p>
-                          </div>
-                        </div>
-                      </li>
-                    ))}
-                  </ul>
-                ) : (
-                  <div className="p-4 text-sm text-gray-500 text-center">
-                    Không tìm thấy sản phẩm phù hợp.
-                  </div>
-                )}
               </div>
-            )}
-          </form>
+            </div>
+          ) : (
+            <Link to="/auth" className={iconBtn} aria-label="Đăng nhập" title="Đăng nhập">
+              <UserIcon />
+            </Link>
+          )}
 
-          {/* CỤM 3: TÀI KHOẢN & GIỎ HÀNG */}
-          <nav className="shrink-0">
-            <ul className="flex items-center gap-4">
-              {user ? (
-                <li className="relative group py-2 cursor-pointer">
-                  <div className="flex items-center gap-2">
-                    <div className="w-7 h-7 bg-white/20 rounded-full flex items-center justify-center text-sm">
-                      👤
-                    </div>
-                    <span className="font-medium hover:text-gray-200">
-                      {user.username}
-                    </span>
-                  </div>
-                  <div className="absolute right-0 top-full mt-0 w-48 bg-white text-black shadow-lg rounded-sm overflow-hidden hidden group-hover:block z-50 border">
-                    <Link
-                      to="/profile"
-                      className="block px-4 py-3 text-sm hover:bg-gray-100 transition"
-                    >
-                      Tài Khoản Của Tôi
-                    </Link>
-                    <Link
-                      to="/my-orders"
-                      className="block px-4 py-3 text-sm hover:bg-gray-100 transition"
-                    >
-                      Đơn Mua
-                    </Link>
-                    <button
-                      onClick={handleLogout}
-                      className="w-full text-left px-4 py-3 text-sm hover:bg-gray-100 transition text-red-600"
-                    >
-                      Đăng Xuất
-                    </button>
-                  </div>
-                </li>
-              ) : (
-                <li>
-                  <Link to="/auth" className="hover:underline font-medium">
-                    Đăng nhập
-                  </Link>
-                </li>
-              )}
-
-              {user?.role === "admin" && (
-                <li>
-                  <Link
-                    to="/admin"
-                    className="font-bold text-yellow-300 hover:text-white transition bg-red-800 px-3 py-1.5 rounded text-sm"
-                  >
-                    Admin Panel
-                  </Link>
-                </li>
-              )}
-
-              <li>
-                <Link
-                  to="/cart"
-                  className="flex items-center gap-2 bg-black/20 px-4 py-2 rounded-lg hover:bg-black/30 transition"
-                >
-                  <svg
-                    className="w-5 h-5"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth="2"
-                      d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z"
-                    ></path>
-                  </svg>
-                  <span className="hidden sm:inline">Giỏ hàng</span>
-                  <span className="bg-yellow-400 text-black px-2 py-0.5 rounded-full text-xs font-bold">
-                    {cart.reduce((sum, item) => sum + item.qty, 0)}
-                  </span>
-                </Link>
-              </li>
-            </ul>
-          </nav>
+          <button
+            onClick={() => setCartOpen(true)}
+            className="ml-1 flex items-center gap-2 rounded-full bg-ink px-3 py-2.5 text-paper transition hover:opacity-85"
+            aria-label={`Giỏ hàng, ${cartCount} sản phẩm`}
+          >
+            <CartIcon className="h-5 w-5" />
+            <span className="font-mono text-sm font-semibold">{cartCount}</span>
+          </button>
         </div>
-      </header>
+      </div>
+    </header>
+  );
+}
 
-      <main className="w-full px-4 md:px-8 mt-6">
+function Footer() {
+  return (
+    <footer className="mt-24 border-t border-ink/[.06]">
+      <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-4 px-4 py-8 text-sm text-ink/50 md:px-8">
+        <span className="font-display font-bold text-ink">
+          UseYour<span className="text-accent">Mind</span>
+        </span>
+        <nav className="flex gap-5">
+          <Link to="/" className="hover:text-ink">Khám phá</Link>
+          <Link to="/compare" className="hover:text-ink">So sánh</Link>
+          <Link to="/my-orders" className="hover:text-ink">Đơn mua</Link>
+        </nav>
+        <span className="font-mono text-[11px]">© {new Date().getFullYear()} · Điểm phù hợp mang tính tham khảo</span>
+      </div>
+    </footer>
+  );
+}
+
+function Shell({ children }) {
+  return <div className="mx-auto w-full max-w-7xl px-4 py-8 md:px-8">{children}</div>;
+}
+
+function ScrollToTop() {
+  const { pathname, search } = useLocation();
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, [pathname, search]);
+  return null;
+}
+
+function AppContent() {
+  const { cart, user, setUser, clearCart, updateQuantity, removeFromCart } = useStore();
+
+  return (
+    <div className="flex min-h-screen w-full flex-col">
+      <ScrollToTop />
+      <Header />
+      <main className="w-full flex-1">
         <Routes>
-          <Route
-            path="/"
-            element={<Home addToCart={addToCart} searchTerm="" />}
-          />
-          <Route
-            path="/search"
-            element={<SearchPage addToCart={addToCart} />}
-          />
-          <Route
-            path="/product/:id"
-            element={<Detail addToCart={addToCart} />}
-          />
-          <Route
-            path="/cart"
-            element={
-              <Cart
-                cart={cart}
-                updateQuantity={updateQuantity}
-                removeFromCart={removeFromCart}
-              />
-            }
-          />
-          <Route path="/auth" element={<Auth setUser={setUser} />} />
-          <Route
-            path="/checkout"
-            element={<Checkout cart={cart} user={user} clearCart={clearCart} />}
-          />
-          <Route path="/admin" element={<Admin />} />
-          <Route
-            path="/profile"
-            element={<Profile user={user} setUser={setUser} />}
-          />
-          <Route path="/my-orders" element={<MyOrders user={user} />} />
+          <Route path="/" element={<Home />} />
+          <Route path="/search" element={<SearchPage />} />
+          <Route path="/product/:id" element={<Detail />} />
+          <Route path="/compare" element={<Compare />} />
+          <Route path="/cart" element={<Cart cart={cart} updateQuantity={updateQuantity} removeFromCart={removeFromCart} />} />
+          <Route path="/auth" element={<Shell><Auth setUser={setUser} /></Shell>} />
+          <Route path="/checkout" element={<Shell><Checkout cart={cart} user={user} clearCart={clearCart} /></Shell>} />
+          <Route path="/admin" element={<Shell><Admin /></Shell>} />
+          <Route path="/profile" element={<Shell><Profile user={user} setUser={setUser} /></Shell>} />
+          <Route path="/my-orders" element={<Shell><MyOrders user={user} /></Shell>} />
         </Routes>
       </main>
+      <Footer />
+      <CartDrawer />
+      <CompareDock />
+      <CommandPalette />
+      <Toasts />
     </div>
   );
 }
@@ -341,7 +186,9 @@ function AppContent() {
 export default function App() {
   return (
     <BrowserRouter>
-      <AppContent />
+      <StoreProvider>
+        <AppContent />
+      </StoreProvider>
     </BrowserRouter>
   );
 }
