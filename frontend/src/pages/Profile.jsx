@@ -1,5 +1,6 @@
 
 import { useState, useEffect } from "react";
+import { API_URL } from "../lib/api";
 import { Link } from "react-router-dom";
 
 export default function Profile({ user, setUser }) {
@@ -76,7 +77,7 @@ export default function Profile({ user, setUser }) {
 
     try {
       const res = await fetch(
-        `http://localhost:5000/api/users/${user.id || user.user_id}`,
+        `${API_URL}/api/users/${user.id || user.user_id}`,
         {
           method: "PUT",
           headers: {
@@ -134,7 +135,7 @@ export default function Profile({ user, setUser }) {
 
     try {
       const res = await fetch(
-        "http://localhost:5000/api/users/change-password",
+        `${API_URL}/api/users/change-password`,
         {
           method: "POST",
           headers: {

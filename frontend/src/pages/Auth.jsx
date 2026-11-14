@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { API_URL } from "../lib/api";
 import { useNavigate } from "react-router-dom";
 
 export default function Auth({ setUser }) {
@@ -31,7 +32,7 @@ export default function Auth({ setUser }) {
   const handleLoginSubmit = async (e) => {
     e.preventDefault();
     try {
-      const res = await fetch("http://localhost:5000/api/users/login", {
+      const res = await fetch(`${API_URL}/api/users/login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ username, password }),
@@ -59,7 +60,7 @@ export default function Auth({ setUser }) {
   const handleRegisterSubmit = async (e) => {
     e.preventDefault();
     try {
-      const res = await fetch("http://localhost:5000/api/users/register", {
+      const res = await fetch(`${API_URL}/api/users/register`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
