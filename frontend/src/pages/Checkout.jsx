@@ -1,5 +1,4 @@
 import { useState, useEffect } from "react";
-import { API_URL } from "../lib/api";
 import { useNavigate, Link } from "react-router-dom";
 
 export default function Checkout({ cart, user, clearCart }) {
@@ -81,7 +80,7 @@ export default function Checkout({ cart, user, clearCart }) {
     };
 
     try {
-      const res = await fetch(`${API_URL}/api/orders`, {
+      const res = await fetch("http://localhost:5000/api/orders", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(orderPayload),

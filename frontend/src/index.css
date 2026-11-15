@@ -2,165 +2,22 @@
 @tailwind components;
 @tailwind utilities;
 
-/* ===== Bảng màu (RGB để dùng được độ trong suốt /xx) ===== */
-:root {
-  --paper: 244 246 251;
-  --surface: 255 255 255;
-  --ink: 10 21 48;
-  --accent: 31 75 240;
-  --mind-50: 238 244 255;
-  --mind-100: 220 231 255;
-  --mind-200: 185 206 255;
-  --g50: 249 250 251;
-  --g100: 243 244 246;
-  --g200: 229 231 235;
-  --g300: 209 213 219;
-  --g400: 156 163 175;
-  --g500: 107 114 128;
-  --g600: 75 85 99;
-  --g700: 55 65 81;
-  --g800: 31 41 55;
-  --g900: 17 24 39;
-  color-scheme: light;
-}
-.dark {
-  --paper: 7 12 28;
-  --surface: 14 22 46;
-  --ink: 228 234 250;
-  --accent: 110 150 255;
-  --mind-50: 22 34 72;
-  --mind-100: 28 44 94;
-  --mind-200: 40 62 128;
-  --g50: 17 26 52;
-  --g100: 22 33 63;
-  --g200: 32 44 78;
-  --g300: 46 60 100;
-  --g400: 98 110 140;
-  --g500: 135 146 174;
-  --g600: 163 173 198;
-  --g700: 193 201 220;
-  --g800: 220 226 239;
-  --g900: 238 242 250;
-  color-scheme: dark;
-}
-
-/* Trang cũ dùng bg-white / text-mind-6xx: chỉnh lại cho chế độ tối */
-.dark .bg-white {
-  background-color: rgb(var(--surface));
-}
-.dark .text-mind-600,
-.dark .text-mind-700,
-.dark .text-mind-800,
-.dark .text-red-500,
-.dark .text-red-600,
-.dark .text-red-700,
-.dark .text-blue-600 {
-  color: rgb(var(--accent));
-}
-
-@layer base {
-  html {
-    scroll-behavior: smooth;
-  }
-  body {
-    @apply bg-paper font-sans text-ink antialiased transition-colors duration-300;
-    overflow-x: clip;
-  }
-  ::selection {
-    background: rgba(52, 99, 255, 0.3);
-  }
-  h1,
-  h2,
-  h3 {
-    @apply font-display tracking-tight;
-  }
-  input,
-  select,
-  textarea {
-    @apply bg-surface text-ink;
-  }
-}
-
-@layer components {
-  .btn-primary {
-    @apply inline-flex items-center justify-center gap-2 rounded-full bg-ink px-5 py-2.5 font-semibold text-paper transition hover:opacity-85 active:scale-[.98] disabled:cursor-not-allowed disabled:opacity-30;
-  }
-  .btn-accent {
-    @apply inline-flex items-center justify-center gap-2 rounded-full bg-mind-600 px-5 py-2.5 font-semibold text-white transition hover:bg-mind-500 active:scale-[.98] disabled:cursor-not-allowed disabled:opacity-30;
-  }
-  .btn-ghost {
-    @apply inline-flex items-center justify-center gap-2 rounded-full border border-ink/15 bg-surface px-5 py-2.5 font-semibold text-ink transition hover:border-ink/40 active:scale-[.98];
-  }
-  .card {
-    @apply rounded-3xl border border-ink/[.07] bg-surface;
-  }
-  .chip {
-    @apply inline-flex items-center rounded-full bg-ink/[.05] px-2.5 py-1 font-mono text-[11px] font-medium text-ink/70;
-  }
-  .eyebrow {
-    @apply font-mono text-[11px] font-semibold uppercase tracking-[.18em] text-accent;
-  }
-  .dot-grid {
-    background-image: radial-gradient(rgb(var(--ink) / 0.07) 1px, transparent 1px);
-    background-size: 22px 22px;
-  }
-}
-
-/* Thanh trượt */
-input[type="range"].mind-range {
-  -webkit-appearance: none;
-  appearance: none;
-  width: 100%;
-  height: 6px;
-  border-radius: 999px;
-  background: linear-gradient(to right, #3463ff var(--val, 50%), rgb(var(--ink) / 0.1) var(--val, 50%));
-  outline: none;
-  cursor: pointer;
-}
-input[type="range"].mind-range::-webkit-slider-thumb {
-  -webkit-appearance: none;
-  width: 18px;
-  height: 18px;
-  border-radius: 50%;
-  background: rgb(var(--surface));
-  border: 4px solid #3463ff;
-  box-shadow: 0 0 0 4px rgba(52, 99, 255, 0.15);
-  transition: transform 0.15s;
-}
-input[type="range"].mind-range::-webkit-slider-thumb:hover {
-  transform: scale(1.15);
-}
-input[type="range"].mind-range::-moz-range-thumb {
-  width: 12px;
-  height: 12px;
-  border-radius: 50%;
-  background: rgb(var(--surface));
-  border: 4px solid #3463ff;
-}
-input[type="range"].mind-range:focus-visible::-webkit-slider-thumb {
-  box-shadow: 0 0 0 6px rgba(52, 99, 255, 0.35);
-}
-
-.scrollbar-hide {
-  -ms-overflow-style: none;
-  scrollbar-width: none;
-}
+/* Ẩn thanh cuộn ngang Slider Thương hiệu */
 .scrollbar-hide::-webkit-scrollbar {
   display: none;
 }
+
+/* Thanh cuộn siêu mỏng sang chảnh cho Cột Bộ Lọc bên trái */
 .scrollbar-thin::-webkit-scrollbar {
   width: 5px;
 }
+.scrollbar-thin::-webkit-scrollbar-track {
+  background: transparent;
+}
 .scrollbar-thin::-webkit-scrollbar-thumb {
-  background-color: rgb(var(--ink) / 0.15);
+  background-color: #d1d5db; /* Màu xám nhạt */
   border-radius: 10px;
 }
-
-@media (prefers-reduced-motion: reduce) {
-  *,
-  *::before,
-  *::after {
-    animation-duration: 0.01ms !important;
-    transition-duration: 0.01ms !important;
-  }
+.scrollbar-thin::-webkit-scrollbar-thumb:hover {
+  background-color: #9ca3af; /* Đậm hơn khi hover */
 }

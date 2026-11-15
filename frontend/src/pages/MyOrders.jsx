@@ -1,12 +1,11 @@
 import { useState, useEffect } from "react";
-import { API_URL } from "../lib/api";
 
 export default function MyOrders({ user }) {
   const [orders, setOrders] = useState([]);
 
   useEffect(() => {
     if (user) {
-      fetch(`${API_URL}/api/orders/user/${user.id}`)
+      fetch(`http://localhost:5000/api/orders/user/${user.id}`)
         .then((res) => res.json())
         .then((data) => {
           // BẢO VỆ 1: Ép kiểu để orders luôn luôn là một mảng, không bao giờ bị sập
