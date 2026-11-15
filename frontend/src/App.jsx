@@ -20,6 +20,7 @@ import Admin from "./pages/Admin";
 import Profile from "./pages/Profile";
 import MyOrders from "./pages/MyOrders";
 import SearchPage from "./pages/SearchPage";
+import ShoppingAssistant from "./components/ShoppingAssistant";
 
 function AppContent() {
   const [cart, setCart] = useState([]);
@@ -36,7 +37,7 @@ function AppContent() {
 
   useEffect(() => {
     if (searchInput.trim().length > 0) {
-      fetch(`http://localhost:5000/api/products?search=${searchInput.trim()}`)
+      fetch(`http://localhost:5000/api/products?search=${encodeURIComponent(searchInput.trim())}`)
         .then((res) => res.json())
         .then((data) => {
           setSearchSuggestions(data.slice(0, 4));
@@ -105,7 +106,7 @@ function AppContent() {
     e.preventDefault();
     if (searchInput.trim() !== "") {
       setShowSuggestions(false);
-      navigate(`/search?q=${searchInput.trim()}`);
+      navigate(`/search?q=${encodeURIComponent(searchInput.trim())}`);
     }
   };
 
@@ -334,6 +335,7 @@ function AppContent() {
           <Route path="/my-orders" element={<MyOrders user={user} />} />
         </Routes>
       </main>
+      <ShoppingAssistant addToCart={addToCart} />
     </div>
   );
 }

@@ -12,6 +12,8 @@ export default function Checkout({ cart, user, clearCart }) {
   const [shippingAddress, setShippingAddress] = useState(user?.address || "");
   const [note, setNote] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [quote, setQuote] = useState(null);
+  const [quoteError, setQuoteError] = useState("");
 
   // Đồng bộ lại khi object user thay đổi
   useEffect(() => {
@@ -22,11 +24,23 @@ export default function Checkout({ cart, user, clearCart }) {
     }
   }, [user]);
 
-  // Tính tổng tiền đơn hàng (hỗ trợ cả price_vnd và price cũ)
-  const totalAmount = cart.reduce((sum, item) => {
-    const itemPrice = item.price_vnd || item.price || 0;
-    return sum + itemPrice * (item.qty || 1);
-  }, 0);
+  useEffect(() => {
+    if (!cart.length) return;
+    const controller = new AbortController();
+    setQuote(null);
+    setQuoteError("");
+    fetch("http://localhost:5000/api/cart/calculate", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ items: cart.map((item) => ({ product_id: item.product_id || item.id, quantity: item.qty || 1 })) }),
+      signal: controller.signal,
+    }).then(async (response) => {
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.message || "Không tính được giỏ hàng");
+      return data;
+    }).then(setQuote).catch((error) => { if (error.name !== "AbortError") setQuoteError(error.message); });
+    return () => controller.abort();
+  }, [cart]);
+  const totalAmount = Number(quote?.total_amount || 0);
 
   // Bảo vệ route: Chưa có sản phẩm thì không cho thanh toán
   if (!cart || cart.length === 0) {
@@ -56,6 +70,10 @@ export default function Checkout({ cart, user, clearCart }) {
       alert("Vui lòng nhập đầy đủ số điện thoại và địa chỉ nhận hàng!");
       return;
     }
+    if (!quote) {
+      alert(quoteError || "Đang xác nhận giá và tồn kho, vui lòng chờ.");
+      return;
+    }
 
     setIsSubmitting(true);
 
@@ -63,9 +81,6 @@ export default function Checkout({ cart, user, clearCart }) {
     const formattedItems = cart.map((item) => ({
       product_id: item.product_id || item.id,
       quantity: item.qty || 1,
-      unit_price: item.price_vnd || item.price || 0,
-      name: item.name,
-      image_url: item.image_url || item.image || "",
     }));
 
     // Payload khớp bảng orders của Database
@@ -75,7 +90,6 @@ export default function Checkout({ cart, user, clearCart }) {
       phone: phone.trim(),
       shipping_address: shippingAddress.trim(),
       note: note.trim(),
-      total_amount: totalAmount,
       items: formattedItems,
     };
 
@@ -99,10 +113,8 @@ export default function Checkout({ cart, user, clearCart }) {
         alert(data.message || "Đặt hàng không thành công, vui lòng thử lại!");
       }
     } catch (error) {
-      console.warn("Lỗi API đặt hàng, lưu local fallback:", error);
-      alert("Đặt hàng thành công (Chế độ lưu tạm)!");
-      clearCart();
-      navigate("/");
+      console.error("Không gửi được đơn hàng:", error);
+      alert("Không gửi được đơn hàng. Giỏ hàng của bạn vẫn còn.");
     } finally {
       setIsSubmitting(false);
     }
@@ -211,7 +223,7 @@ export default function Checkout({ cart, user, clearCart }) {
 
             <div className="max-h-72 overflow-y-auto divide-y divide-gray-100 pr-2">
               {cart.map((item, index) => {
-                const price = item.price_vnd || item.price || 0;
+                const price = quote?.items?.find((row) => row.product_id === (item.product_id || item.id))?.unit_price || 0;
                 return (
                   <div
                     key={item.id || index}
@@ -241,6 +253,8 @@ export default function Checkout({ cart, user, clearCart }) {
             </div>
 
             <div className="border-t mt-4 pt-4 space-y-2">
+              {quoteError && <p role="alert" className="text-sm text-red-600">{quoteError}</p>}
+              {!quote && !quoteError && <p className="text-sm text-gray-500">Đang xác nhận giá và tồn kho...</p>}
               <div className="flex justify-between text-sm text-gray-600">
                 <span>Tạm tính</span>
                 <span>{totalAmount.toLocaleString("vi-VN")} đ</span>
@@ -260,9 +274,9 @@ export default function Checkout({ cart, user, clearCart }) {
 
           <button
             type="submit"
-            disabled={isSubmitting}
+            disabled={isSubmitting || !quote}
             className={`w-full mt-6 py-3.5 rounded-lg text-white font-bold uppercase tracking-wide text-sm shadow-md transition ${
-              isSubmitting
+              isSubmitting || !quote
                 ? "bg-gray-400 cursor-not-allowed"
                 : "bg-red-600 hover:bg-red-700 shadow-red-200"
             }`}

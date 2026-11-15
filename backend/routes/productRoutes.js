@@ -1,13 +1,15 @@
 const express = require("express");
 const router = express.Router();
 const pool = require("../db");
+const { indexOneById } = require("../services/indexProduct");
 
 // Câu truy vấn chuẩn JOIN bảng products với brands và categories theo ERD
 const BASE_PRODUCT_SELECT = `
   SELECT 
     p.*,
     p.product_id AS id,
-    p.price_vnd AS price,
+    p.price_vnd::float8 AS price,
+    p.price_vnd::float8 AS price_vnd,
     p.image_url AS image,
     b.brand_name AS brand,
     c.category_name AS category
@@ -87,11 +89,11 @@ router.post("/", async (req, res) => {
         name, model, brand_id, category_id, price_vnd, price_egp, stock_quantity, image_url,
         cpu, gpu, gpu_vram_gb, ram_gb, ssd_gb, hdd_gb,
         screen_size_in, panel_type, resolution, refresh_rate_hz,
-        weight_kg, battery_wh, operating_system, description
+        weight_kg, battery_wh, operating_system, description, search_text
       ) VALUES (
         $1, $2, $3, $4, $5, $6, $7, $8,
         $9, $10, $11, $12, $13, $14,
-        $15, $16, $17, $18, $19, $20, $21, $22
+        $15, $16, $17, $18, $19, $20, $21, $22, $23
       ) RETURNING *;
     `;
 
@@ -118,10 +120,13 @@ router.post("/", async (req, res) => {
       parseFloat(p.battery_wh) || 50,
       p.operating_system || "Windows 11",
       p.description || "",
+      [p.name, brandName, categoryName, p.cpu, p.gpu, p.description].filter(Boolean).join(". "),
     ];
 
     const { rows } = await client.query(insertQuery, values);
     await client.query("COMMIT");
+    try { await indexOneById(rows[0].product_id); }
+    catch (error) { console.warn("Product embedding pending:", error.message); }
 
     res.json({
       success: true,
