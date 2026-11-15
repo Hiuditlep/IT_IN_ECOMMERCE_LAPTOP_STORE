@@ -18,19 +18,42 @@ const BASE_PRODUCT_SELECT = `
   LEFT JOIN categories c ON p.category_id = c.category_id
 `;
 
+// Kèm kết quả XGBoost (giá hợp lý) nếu đã chạy ml/train_price_model.py
+const PRICED_PRODUCT_SELECT = BASE_PRODUCT_SELECT.replace(
+  "c.category_name AS category",
+  `c.category_name AS category,
+    pp.predicted_price_vnd::float8 AS predicted_price_vnd,
+    pp.price_ratio::float8 AS price_ratio,
+    pp.price_label`,
+).replace(
+  "LEFT JOIN categories c ON p.category_id = c.category_id",
+  `LEFT JOIN categories c ON p.category_id = c.category_id
+  LEFT JOIN price_predictions pp ON pp.product_id = p.product_id`,
+);
+
+// Nếu bảng price_predictions chưa tồn tại (chưa train), vẫn trả sản phẩm bình thường
+async function selectProducts(tail, params) {
+  try {
+    return await pool.query(`${PRICED_PRODUCT_SELECT} ${tail}`, params);
+  } catch (error) {
+    if (error.code !== "42P01") throw error; // 42P01 = undefined_table
+    return pool.query(`${BASE_PRODUCT_SELECT} ${tail}`, params);
+  }
+}
+
 // 1. Lấy danh sách sản phẩm (hỗ trợ tìm kiếm)
 router.get("/", async (req, res) => {
   const searchQuery = req.query.search;
   try {
-    let query = `${BASE_PRODUCT_SELECT} ORDER BY p.product_id ASC`;
+    let tail = "ORDER BY p.product_id ASC";
     let params = [];
 
     if (searchQuery) {
-      query = `${BASE_PRODUCT_SELECT} WHERE LOWER(p.name) LIKE $1 OR LOWER(p.search_text) LIKE $1 ORDER BY p.product_id ASC`;
+      tail = "WHERE LOWER(p.name) LIKE $1 OR LOWER(p.search_text) LIKE $1 ORDER BY p.product_id ASC";
       params = [`%${searchQuery.toLowerCase()}%`];
     }
 
-    const { rows } = await pool.query(query, params);
+    const { rows } = await selectProducts(tail, params);
     res.json(rows);
   } catch (error) {
     console.error("Lỗi lấy danh sách sản phẩm:", error);
@@ -41,10 +64,7 @@ router.get("/", async (req, res) => {
 // 2. Lấy chi tiết 1 sản phẩm theo ID
 router.get("/:id", async (req, res) => {
   try {
-    const { rows } = await pool.query(
-      `${BASE_PRODUCT_SELECT} WHERE p.product_id = $1`,
-      [req.params.id],
-    );
+    const { rows } = await selectProducts("WHERE p.product_id = $1", [req.params.id]);
     if (rows.length > 0) {
       res.json(rows[0]);
     } else {

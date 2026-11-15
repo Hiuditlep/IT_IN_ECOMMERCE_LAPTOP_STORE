@@ -20,6 +20,23 @@ Do not rerun `backend/seed.js` on a shared database: it drops all existing table
 
 The original CSV has 1,013 laptops but blank currency, stock and image fields. The seed script assigns stock 10 and converts prices with a fixed multiplier. Confirm the source currency before presenting prices as real. Authentication remains the original mockup and admin routes are not protected server-side; complete authentication before public deployment.
 
+## XGBoost fair-price model
+
+An XGBoost regressor predicts a laptop's fair price from its specs (CPU tier, GPU tier, RAM, SSD, display, brand…). Each product's prediction comes from 5-fold out-of-fold training, so no model prices a laptop it has seen. The site labels products as **Giá tốt** (good deal: below 90% of predicted price), **Giá hợp lý**, or **Giá cao hơn thị trường** (above 115%).
+
+Hold-out test (20% of 1,013 laptops): **XGBoost R² 0.89, MAPE 15.4%**, versus a linear model R² 0.73 and a median baseline R² −0.10. Full numbers are in `ml/artifacts/metrics.json`.
+
+```bash
+py -3.11 -m venv ml/.venv
+ml/.venv/Scripts/python -m pip install -r ml/requirements.txt
+ml/.venv/Scripts/python ml/train_price_model.py --csv   # evaluate only, no database writes
+ml/.venv/Scripts/python ml/train_price_model.py         # read the DB and write the price_predictions table
+```
+
+The second command reads `DATABASE_URL` from `backend/.env.local` and only adds the `price_predictions` table. The products API returns the labels automatically once that table exists; before that, the site works without them.
+
+A Vietnamese guide to the RAG and XGBoost theory, results, and likely Q&A is in [`docs/AI_RAG_XGBOOST.md`](docs/AI_RAG_XGBOOST.md).
+
 ## Checks
 
 Run `npm test` in `backend/` and `npm run build` plus `npm run lint` in `frontend/`. After indexing, try queries such as `ASUS dưới 20 triệu RAM ít nhất 16GB`, `máy nhẹ đi học pin tốt`, and `gaming RTX màn 144Hz`.

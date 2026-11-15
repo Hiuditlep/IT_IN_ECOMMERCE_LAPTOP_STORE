@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
+import { PriceInsight } from "../components/PriceBadge";
 
 export default function Detail({ addToCart }) {
   // ==========================================
@@ -64,6 +65,8 @@ export default function Detail({ addToCart }) {
         <p className="text-red-600 text-3xl font-bold mb-6">
           {(product.price_vnd || product.price || 0).toLocaleString("vi-VN")} đ
         </p>
+
+        <PriceInsight product={product} />
 
         {/* Bảng cấu hình chi tiết (Đã map chuẩn xác theo Database PostgreSQL / CSV) */}
         <div className="bg-gray-50 p-5 rounded-lg mb-6 border">

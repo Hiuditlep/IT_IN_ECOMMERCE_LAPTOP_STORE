@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { Link } from "react-router-dom";
+import { PriceBadge } from "../components/PriceBadge";
 
 export default function Home({ addToCart, searchTerm }) {
   const [allProducts, setAllProducts] = useState([]);
@@ -15,6 +16,7 @@ export default function Home({ addToCart, searchTerm }) {
   const [filterRefresh, setFilterRefresh] = useState([]);
   const [filterCpu, setFilterCpu] = useState([]);
   const [filterGpu, setFilterGpu] = useState([]);
+  const [onlyGoodDeals, setOnlyGoodDeals] = useState(false);
 
   const brandSliderRef = useRef(null);
 
@@ -145,6 +147,11 @@ const categories = [
       });
     }
 
+    // Lọc theo nhãn của mô hình XGBoost
+    if (onlyGoodDeals) {
+      result = result.filter((p) => p.price_label === "good");
+    }
+
     setFilteredProducts(result);
   }, [
     allProducts,
@@ -156,6 +163,7 @@ const categories = [
     filterRefresh,
     filterCpu,
     filterGpu,
+    onlyGoodDeals,
   ]);
 
   const toggleFilter = (state, setState, value) => {
@@ -501,8 +509,19 @@ const categories = [
             <h2 className="text-xl font-bold uppercase text-gray-800 border-b-2 border-red-600 inline-block pb-1 mb-[-9px]">
               LAPTOP NỔI BẬT
             </h2>
-            <div className="hidden sm:flex gap-4 text-sm font-medium">
-              <span className="text-gray-500">
+            <div className="flex items-center gap-4 text-sm font-medium">
+              {allProducts.some((p) => p.price_label) && (
+                <label className="flex items-center gap-2 cursor-pointer text-green-700 bg-green-50 border border-green-200 px-3 py-1 rounded-full">
+                  <input
+                    type="checkbox"
+                    checked={onlyGoodDeals}
+                    onChange={(e) => setOnlyGoodDeals(e.target.checked)}
+                    className="accent-green-600"
+                  />
+                  🤖 Chỉ máy giá tốt (AI)
+                </label>
+              )}
+              <span className="hidden sm:inline text-gray-500">
                 Tìm thấy{" "}
                 <strong className="text-red-600 text-lg">
                   {filteredProducts.length}
@@ -527,6 +546,7 @@ const categories = [
                   setFilterRefresh([]);
                   setFilterCpu([]);
                   setFilterGpu([]);
+                  setOnlyGoodDeals(false);
                 }}
                 className="mt-4 px-4 py-2 bg-red-50 text-red-600 rounded-md font-semibold hover:bg-red-100 transition"
               >
@@ -587,6 +607,9 @@ const categories = [
                         <p className="text-red-600 font-bold text-base md:text-lg">
                           {productPrice.toLocaleString("vi-VN")} ₫
                         </p>
+                        <div className="mt-1 min-h-[22px]">
+                          <PriceBadge product={item} />
+                        </div>
                       </div>
                     </Link>
                     <div className="p-3 pt-0 mt-auto">

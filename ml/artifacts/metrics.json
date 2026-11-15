@@ -1,0 +1,56 @@
+{
+  "model_version": "xgb-price-v1",
+  "trained_at": "2026-11-15T11:11:52+00:00",
+  "source": "csv",
+  "n_samples": 1013,
+  "n_features": 35,
+  "target": "log1p(price_vnd)",
+  "thresholds": {
+    "good_deal_below": 0.9,
+    "overpriced_above": 1.15
+  },
+  "holdout_test_20pct": {
+    "baseline_median": {
+      "MAE_vnd": 10248241,
+      "MAPE_pct": 43.34,
+      "R2": -0.0993
+    },
+    "baseline_linear_ridge": {
+      "MAE_vnd": 5367500,
+      "MAPE_pct": 21.81,
+      "R2": 0.7311
+    },
+    "xgboost": {
+      "MAE_vnd": 3527213,
+      "MAPE_pct": 15.44,
+      "R2": 0.8895
+    }
+  },
+  "cv_5fold_all": {
+    "MAE_vnd": 3452027,
+    "MAPE_pct": 15.25,
+    "R2": 0.9087
+  },
+  "label_counts": {
+    "fair": 543,
+    "good": 275,
+    "high": 195
+  },
+  "top_features": {
+    "ram_gb": 0.2125999927520752,
+    "gpu_vram_gb": 0.1454000025987625,
+    "cpu_tier": 0.09740000218153,
+    "ssd_gb": 0.09470000118017197,
+    "brand_Microsoft": 0.07429999858140945,
+    "resolution_mp": 0.049800001084804535,
+    "brand_Infinix": 0.03610000014305115,
+    "cat_General": 0.03290000185370445,
+    "battery_wh": 0.0272000003606081,
+    "brand_Razer": 0.02160000056028366,
+    "gpu_series": 0.019300000742077827,
+    "os_windows_pro": 0.019099999219179153,
+    "cpu_gen": 0.015399999916553497,
+    "gpu_tier": 0.01510000042617321,
+    "screen_size_in": 0.014100000262260437
+  }
+}
