@@ -7,24 +7,32 @@ function isConfigured() {
   return Boolean(process.env.GEMINI_API_KEY);
 }
 
+// Gemini gói miễn phí đôi khi quá tải (503) hoặc giới hạn tốc độ (429) tạm thời → thử lại
+const RETRY_STATUSES = new Set([429, 500, 503]);
+const MAX_ATTEMPTS = 3;
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
 async function request(model, action, body) {
   if (!isConfigured()) throw new Error("GEMINI_API_KEY chưa được cấu hình");
 
-  const response = await fetch(`${GEMINI_BASE_URL}/${model}:${action}`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "x-goog-api-key": process.env.GEMINI_API_KEY,
-    },
-    body: JSON.stringify(body),
-    signal: AbortSignal.timeout(5000),
-  });
+  for (let attempt = 1; ; attempt++) {
+    const response = await fetch(`${GEMINI_BASE_URL}/${model}:${action}`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-goog-api-key": process.env.GEMINI_API_KEY,
+      },
+      body: JSON.stringify(body),
+      signal: AbortSignal.timeout(15000),
+    });
 
-  if (!response.ok) {
-    // Do not log the request or key. The caller can fall back to catalog search.
-    throw new Error(`Gemini API trả về HTTP ${response.status}`);
+    if (response.ok) return response.json();
+    if (!RETRY_STATUSES.has(response.status) || attempt >= MAX_ATTEMPTS) {
+      // Do not log the request or key. The caller can fall back to catalog search.
+      throw new Error(`Gemini API trả về HTTP ${response.status}`);
+    }
+    await sleep(600 * attempt); // chờ 0,6s rồi 1,2s trước khi thử lại
   }
-  return response.json();
 }
 
 async function generateJson(systemPrompt, userPrompt, schema) {

@@ -24,7 +24,7 @@ The original CSV has 1,013 laptops but blank currency, stock and image fields. T
 
 An XGBoost regressor predicts a laptop's fair price from its specs (CPU tier, GPU tier, RAM, SSD, display, brand…). Each product's prediction comes from 5-fold out-of-fold training, so no model prices a laptop it has seen. The site labels products as **Giá tốt** (good deal: below 90% of predicted price), **Giá hợp lý**, or **Giá cao hơn thị trường** (above 115%).
 
-Hold-out test (20% of 1,013 laptops): **XGBoost R² 0.89, MAPE 15.4%**, versus a linear model R² 0.73 and a median baseline R² −0.10. Full numbers are in `ml/artifacts/metrics.json`.
+Hold-out test (20% of 1,013 laptops): **XGBoost R² 0.86, MAPE 16.0%**, versus a linear model R² 0.68 and a median baseline R² −0.08 (5-fold CV: R² 0.91). Full numbers are in `ml/artifacts/metrics.json`.
 
 ```bash
 py -3.11 -m venv ml/.venv

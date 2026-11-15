@@ -1,7 +1,7 @@
 {
   "model_version": "xgb-price-v1",
-  "trained_at": "2026-11-15T11:11:52+00:00",
-  "source": "csv",
+  "trained_at": "2026-11-15T11:25:58+00:00",
+  "source": "database",
   "n_samples": 1013,
   "n_features": 35,
   "target": "log1p(price_vnd)",
@@ -11,46 +11,46 @@
   },
   "holdout_test_20pct": {
     "baseline_median": {
-      "MAE_vnd": 10248241,
-      "MAPE_pct": 43.34,
-      "R2": -0.0993
+      "MAE_vnd": 10139446,
+      "MAPE_pct": 43.91,
+      "R2": -0.0755
     },
     "baseline_linear_ridge": {
-      "MAE_vnd": 5367500,
-      "MAPE_pct": 21.81,
-      "R2": 0.7311
+      "MAE_vnd": 5731671,
+      "MAPE_pct": 21.74,
+      "R2": 0.6831
     },
     "xgboost": {
-      "MAE_vnd": 3527213,
-      "MAPE_pct": 15.44,
-      "R2": 0.8895
+      "MAE_vnd": 3927472,
+      "MAPE_pct": 15.98,
+      "R2": 0.8615
     }
   },
   "cv_5fold_all": {
-    "MAE_vnd": 3452027,
-    "MAPE_pct": 15.25,
-    "R2": 0.9087
+    "MAE_vnd": 3485759,
+    "MAPE_pct": 14.96,
+    "R2": 0.9051
   },
   "label_counts": {
     "fair": 543,
-    "good": 275,
-    "high": 195
+    "good": 267,
+    "high": 203
   },
   "top_features": {
-    "ram_gb": 0.2125999927520752,
-    "gpu_vram_gb": 0.1454000025987625,
-    "cpu_tier": 0.09740000218153,
-    "ssd_gb": 0.09470000118017197,
-    "brand_Microsoft": 0.07429999858140945,
-    "resolution_mp": 0.049800001084804535,
-    "brand_Infinix": 0.03610000014305115,
-    "cat_General": 0.03290000185370445,
-    "battery_wh": 0.0272000003606081,
-    "brand_Razer": 0.02160000056028366,
-    "gpu_series": 0.019300000742077827,
-    "os_windows_pro": 0.019099999219179153,
-    "cpu_gen": 0.015399999916553497,
-    "gpu_tier": 0.01510000042617321,
-    "screen_size_in": 0.014100000262260437
+    "ram_gb": 0.19169999659061432,
+    "gpu_vram_gb": 0.17020000517368317,
+    "ssd_gb": 0.10350000113248825,
+    "cpu_tier": 0.09109999984502792,
+    "brand_Microsoft": 0.07810000330209732,
+    "resolution_mp": 0.057999998331069946,
+    "cat_General": 0.0333000011742115,
+    "brand_Infinix": 0.028999999165534973,
+    "battery_wh": 0.026900000870227814,
+    "brand_Razer": 0.020999999716877937,
+    "gpu_series": 0.020400000736117363,
+    "os_windows_pro": 0.01600000075995922,
+    "screen_size_in": 0.015699999406933784,
+    "cpu_gen": 0.014800000004470348,
+    "gpu_tier": 0.013799999840557575
   }
 }

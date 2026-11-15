@@ -117,18 +117,18 @@ Dữ liệu gốc là chữ (ví dụ `"Intel Core i9-14900HX"`), nên phải ch
 
 | Mô hình | MAE (sai số trung bình) | MAPE (sai số %) | R² |
 |---|---|---|---|
-| Đoán giá trung vị | 10,25 triệu ₫ | 43,3% | −0,10 |
-| Hồi quy tuyến tính (Ridge) | 5,37 triệu ₫ | 21,8% | 0,73 |
-| **XGBoost** | **3,53 triệu ₫** | **15,4%** | **0,89** |
+| Đoán giá trung vị | 10,14 triệu ₫ | 43,9% | −0,08 |
+| Hồi quy tuyến tính (Ridge) | 5,73 triệu ₫ | 21,7% | 0,68 |
+| **XGBoost** | **3,93 triệu ₫** | **16,0%** | **0,86** |
 
-5-fold cross-validation trên toàn bộ dữ liệu: **R² = 0,91, MAPE = 15,3%**.
+5-fold cross-validation trên toàn bộ dữ liệu: **R² = 0,91, MAPE = 15,0%**.
 
 Ý nghĩa các chỉ số:
-- **MAE**: trung bình mô hình đoán lệch khoảng 3,5 triệu.
-- **MAPE**: trung bình lệch khoảng 15% so với giá thật.
-- **R² = 0,89**: mô hình giải thích được **89% sự biến động giá**. Bằng 1 là hoàn hảo, bằng 0 thì không hơn gì đoán trung bình.
+- **MAE**: trung bình mô hình đoán lệch khoảng 3,9 triệu.
+- **MAPE**: trung bình lệch khoảng 16% so với giá thật.
+- **R² = 0,86**: mô hình giải thích được **86% sự biến động giá**. Bằng 1 là hoàn hảo, bằng 0 thì không hơn gì đoán trung bình.
 
-**Đặc trưng quan trọng nhất** (feature importance): RAM, VRAM của GPU, cấp CPU, dung lượng SSD, hãng (Microsoft), độ phân giải màn hình. Kết quả này **hợp lý về mặt thực tế**, cho thấy mô hình học đúng quy luật.
+**Đặc trưng quan trọng nhất** (feature importance): RAM, VRAM của GPU, dung lượng SSD, cấp CPU, hãng (Microsoft), độ phân giải màn hình. Kết quả này **hợp lý về mặt thực tế**, cho thấy mô hình học đúng quy luật.
 
 > Số liệu chi tiết nằm trong `ml/artifacts/metrics.json`, được tạo lại mỗi lần chạy script.
 
@@ -145,7 +145,7 @@ tỷ lệ = giá thật / giá dự đoán
   còn lại → "fair"  (Giá hợp lý)
 ```
 
-Kết quả: 275 máy giá tốt, 543 máy hợp lý, 195 máy giá cao. Dự đoán được lưu vào bảng `price_predictions`, backend JOIN vào API sản phẩm.
+Kết quả: 267 máy giá tốt, 543 máy hợp lý, 203 máy giá cao. Dự đoán được lưu vào bảng `price_predictions`, backend JOIN vào API sản phẩm.
 
 ### 2.6 Chạy lại mô hình
 
@@ -174,7 +174,7 @@ Lệnh thứ hai cần `DATABASE_URL` trong `backend/.env.local`. Script chỉ *
 |---|---|
 | RAG khác fine-tuning thế nào? | Fine-tuning **dạy lại** model (tốn kém, dữ liệu cố định). RAG **không sửa model**, chỉ tra cứu dữ liệu mới mỗi lần hỏi, nên giá hay tồn kho thay đổi là cập nhật ngay. |
 | Làm sao biết LLM không bịa? | Chỉ đưa dữ liệu thật vào prompt, chỉ chấp nhận ID có trong danh sách, giá hiển thị lấy từ DB, `temperature = 0`. |
-| Vì sao không dùng hồi quy tuyến tính? | Đã thử làm baseline: R² chỉ 0,73 so với 0,89 của XGBoost, vì quan hệ giữa thông số và giá là phi tuyến. |
+| Vì sao không dùng hồi quy tuyến tính? | Đã thử làm baseline: R² chỉ 0,68 so với 0,86 của XGBoost, vì quan hệ giữa thông số và giá là phi tuyến. |
 | Overfitting xử lý ra sao? | Learning rate nhỏ, `max_depth=5`, regularization, subsampling, và đánh giá trên tập test riêng cùng 5-fold CV. |
 | Vì sao dự đoán log(giá)? | Giá lệch phải. Log giúp tối ưu sai số tương đối và giảm ảnh hưởng của máy rất đắt. |
 | Cosine similarity là gì? | Đo góc giữa hai vector, không phụ thuộc độ dài. Gần 1 nghĩa là cùng hướng, tức cùng ngữ nghĩa. |
