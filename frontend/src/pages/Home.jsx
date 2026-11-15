@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { Link } from "react-router-dom";
 import { PriceBadge } from "../components/PriceBadge";
+import { API_URL } from "../lib/api";
 
 export default function Home({ addToCart, searchTerm }) {
   const [allProducts, setAllProducts] = useState([]);
@@ -54,7 +55,7 @@ const categories = [
   ];
 
   useEffect(() => {
-    fetch(`http://localhost:5000/api/products?search=${searchTerm || ""}`)
+    fetch(`${API_URL}/api/products?search=${searchTerm || ""}`)
       .then((res) => res.json())
       .then((data) => {
         if (Array.isArray(data)) {

@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
+import { API_URL } from "../lib/api";
 
 export default function MegaMenu() {
   const [hoveredBrand, setHoveredBrand] = useState("");
@@ -7,7 +8,7 @@ export default function MegaMenu() {
 
   // GỌI API ĐỂ LẤY DỮ LIỆU MENU ĐỘNG TỪ DATABASE
   useEffect(() => {
-    fetch("http://localhost:5000/api/products")
+    fetch(`${API_URL}/api/products`)
       .then((res) => res.json())
       .then((data) => {
         // Gom nhóm sản phẩm theo Brand và Category

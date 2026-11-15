@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { PriceInsight } from "../components/PriceBadge";
+import { API_URL } from "../lib/api";
 
 export default function Detail({ addToCart }) {
   // ==========================================
@@ -15,7 +16,7 @@ export default function Detail({ addToCart }) {
   // ==========================================
   useEffect(() => {
     // Gửi request lên Backend để xin thông tin của đúng cái ID trên URL
-    fetch(`http://localhost:5000/api/products/${id}`)
+    fetch(`${API_URL}/api/products/${id}`)
       .then((res) => res.json())
       .then((data) => setProduct(data));
   }, [id]); // Mỗi khi ID thay đổi thì sẽ tự động gọi lại API

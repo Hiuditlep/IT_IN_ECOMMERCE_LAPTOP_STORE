@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
+import { API_URL } from "../lib/api";
 
 export default function SearchPage({ addToCart }) {
   const [params] = useSearchParams();
@@ -13,7 +14,7 @@ export default function SearchPage({ addToCart }) {
     const controller = new AbortController();
     setLoading(true);
     setError("");
-    fetch("http://localhost:5000/api/ai/search", {
+    fetch(`${API_URL}/api/ai/search`, {
       method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ query }), signal: controller.signal,
     }).then(async (response) => {

@@ -21,6 +21,7 @@ import Profile from "./pages/Profile";
 import MyOrders from "./pages/MyOrders";
 import SearchPage from "./pages/SearchPage";
 import ShoppingAssistant from "./components/ShoppingAssistant";
+import { API_URL } from "./lib/api";
 
 function AppContent() {
   const [cart, setCart] = useState([]);
@@ -37,7 +38,7 @@ function AppContent() {
 
   useEffect(() => {
     if (searchInput.trim().length > 0) {
-      fetch(`http://localhost:5000/api/products?search=${encodeURIComponent(searchInput.trim())}`)
+      fetch(`${API_URL}/api/products?search=${encodeURIComponent(searchInput.trim())}`)
         .then((res) => res.json())
         .then((data) => {
           setSearchSuggestions(data.slice(0, 4));

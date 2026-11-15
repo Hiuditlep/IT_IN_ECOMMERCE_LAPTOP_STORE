@@ -26,7 +26,16 @@ app.use("/api/cart", cartRoutes);
 // ==========================================
 // KHỞI ĐỘNG SERVER
 // ==========================================
-const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => {
-  console.log(`Backend đang chạy tại: http://localhost:${PORT}`);
-});
+// Kiểm tra nhanh backend còn sống (dùng sau khi deploy)
+app.get("/api/health", (req, res) => res.json({ ok: true }));
+
+// Chạy trực tiếp (npm run dev / npm start) → mở cổng như bình thường.
+// Trên Vercel, api/index.js import app này và chạy dạng serverless function.
+if (require.main === module) {
+  const PORT = process.env.PORT || 5000;
+  app.listen(PORT, () => {
+    console.log(`Backend đang chạy tại: http://localhost:${PORT}`);
+  });
+}
+
+module.exports = app;

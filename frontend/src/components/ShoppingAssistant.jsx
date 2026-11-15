@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
+import { API_URL } from "../lib/api";
 
 export default function ShoppingAssistant({ addToCart }) {
   const [open, setOpen] = useState(false);
@@ -16,7 +17,7 @@ export default function ShoppingAssistant({ addToCart }) {
     setInput("");
     setBusy(true);
     try {
-      const response = await fetch("http://localhost:5000/api/ai/assistant", {
+      const response = await fetch(`${API_URL}/api/ai/assistant`, {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ message, history }),
       });

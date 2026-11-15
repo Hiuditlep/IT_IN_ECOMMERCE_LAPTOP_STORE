@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate, Link } from "react-router-dom";
+import { API_URL } from "../lib/api";
 
 export default function Checkout({ cart, user, clearCart }) {
   const navigate = useNavigate();
@@ -29,7 +30,7 @@ export default function Checkout({ cart, user, clearCart }) {
     const controller = new AbortController();
     setQuote(null);
     setQuoteError("");
-    fetch("http://localhost:5000/api/cart/calculate", {
+    fetch(`${API_URL}/api/cart/calculate`, {
       method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ items: cart.map((item) => ({ product_id: item.product_id || item.id, quantity: item.qty || 1 })) }),
       signal: controller.signal,
@@ -94,7 +95,7 @@ export default function Checkout({ cart, user, clearCart }) {
     };
 
     try {
-      const res = await fetch("http://localhost:5000/api/orders", {
+      const res = await fetch(`${API_URL}/api/orders`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(orderPayload),
