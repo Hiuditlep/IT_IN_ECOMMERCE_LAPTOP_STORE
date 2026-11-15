@@ -1,0 +1,534 @@
+=====================================================================
+  USEYOURMIND LAPTOP STORE
+  TÀI LIỆU CÔNG NGHỆ SỬ DỤNG & GIẢI THÍCH CODE CHI TIẾT
+=====================================================================
+Môn: IT in E-commerce
+Mã nguồn: https://github.com/Hiuditlep/IT_IN_ECOMMERCE_LAPTOP_STORE (nhánh main)
+Phiên bản mô tả: web bán laptop + Trợ lý AI (RAG với Gemini) + Định giá AI (XGBoost)
+
+MỤC LỤC
+  1. Tổng quan hệ thống
+  2. Cấu trúc thư mục
+  3. Công nghệ sử dụng và lý do chọn
+  4. Cơ sở dữ liệu (PostgreSQL trên Neon)
+  5. Backend (Node.js + Express) – giải thích từng file
+  6. Phần AI 1: RAG – Trợ lý tư vấn và tìm kiếm ngữ nghĩa
+  7. Phần AI 2: XGBoost – Mô hình dự đoán giá hợp lý
+  8. Frontend (React + Vite + Tailwind) – giải thích từng file
+  9. Luồng dữ liệu đầu-cuối (ví dụ cụ thể)
+ 10. Triển khai (Vercel + Neon) và biến môi trường
+ 11. Bảo mật, kiểm thử, hạn chế
+ 12. Lệnh chạy dự án
+
+
+---------------------------------------------------------------------
+1. TỔNG QUAN HỆ THỐNG
+---------------------------------------------------------------------
+Hệ thống gồm 3 tầng (3-tier architecture) cùng 2 thành phần AI:
+
+   [Trình duyệt]  React SPA (frontend)
+        │  HTTP/JSON (fetch)
+        ▼
+   [Backend]      Express REST API (Node.js)  ──►  Gemini API (Google)
+        │  SQL (node-postgres)                     - embedding (vector)
+        ▼                                          - sinh văn bản (LLM)
+   [Database]     PostgreSQL trên Neon
+                  + extension pgvector (lưu vector)
+                  + bảng price_predictions (kết quả XGBoost)
+
+   [ML offline]   Python + XGBoost: đọc DB → huấn luyện → ghi dự đoán vào DB
+
+Chức năng chính:
+  - Khách: xem danh mục, lọc, tìm kiếm, xem chi tiết, giỏ hàng, đặt hàng,
+    xem đơn mua, sửa hồ sơ, đổi mật khẩu.
+  - AI: trợ lý chat tư vấn (RAG), tìm kiếm ngữ nghĩa, nhãn "Giá tốt/Hợp lý/Cao"
+    và giá hợp lý dự đoán (XGBoost).
+  - Admin: quản lý sản phẩm, người dùng, đơn hàng (duyệt/huỷ/xoá).
+
+
+---------------------------------------------------------------------
+2. CẤU TRÚC THƯ MỤC
+---------------------------------------------------------------------
+backend/
+  server.js                 Khởi tạo Express, gắn route, export app cho Vercel
+  db.js                     Tạo connection pool tới PostgreSQL (đọc DATABASE_URL)
+  seed.js                   Tạo 9 bảng + nạp 1.013 laptop từ CSV (CHỈ chạy DB trống)
+  laptops_clean_FINAL.csv   Dữ liệu gốc 1.013 laptop
+  routes/
+    productRoutes.js        /api/products  – danh sách, chi tiết, thêm, xoá
+    userRoutes.js           /api/users     – đăng ký, đăng nhập, hồ sơ, đổi mật khẩu
+    orderRoutes.js          /api/orders    – đặt hàng, đơn của user, admin cập nhật
+    cartRoutes.js           /api/cart      – tính tiền giỏ hàng phía server
+    aiRoutes.js             /api/ai        – tìm kiếm AI + trợ lý tư vấn (RAG)
+  services/
+    gemini.js               Gọi Gemini API: sinh JSON, tạo embedding, tự thử lại
+    catalogSearch.js        Hiểu ý định + lọc SQL + tìm vector (lõi của RAG)
+    indexProduct.js         Tạo/cập nhật embedding cho 1 sản phẩm
+    cart.js                 Chuẩn hoá giỏ hàng, tính giá từ DB
+  scripts/
+    migrate.js              Bật pgvector + tạo bảng product_embeddings
+    indexEmbeddings.js      Tạo embedding cho toàn bộ sản phẩm
+  migrations/
+    001_product_embeddings.sql
+    002_price_predictions.sql
+  tests/                    Test tự động (node --test)
+  api/index.js              Điểm vào serverless cho Vercel
+  vercel.json               Cấu hình Vercel cho backend
+
+frontend/
+  src/
+    main.jsx                Điểm khởi động React
+    App.jsx                 Header, thanh tìm kiếm, giỏ hàng, định tuyến, trợ lý AI
+    lib/api.js              Địa chỉ backend (biến VITE_API_URL)
+    pages/                  Home, Detail, SearchPage, Cart, Checkout, Auth,
+                            Profile, MyOrders, Admin
+    components/
+      MegaMenu.jsx          Menu "Danh mục" theo hãng/phân khúc
+      ShoppingAssistant.jsx Khung chat "Tư vấn AI"
+      PriceBadge.jsx        Nhãn giá & khung "Định giá AI" (XGBoost)
+  public/                   Logo, logo các hãng, ảnh nhu cầu sử dụng
+  vercel.json               Cấu hình SPA cho Vercel
+
+ml/
+  train_price_model.py      Huấn luyện & đánh giá XGBoost, ghi dự đoán vào DB
+  requirements.txt          Thư viện Python
+  artifacts/metrics.json    Số liệu đánh giá mô hình
+  artifacts/price_model.json  Mô hình đã huấn luyện
+
+docs/AI_RAG_XGBOOST.md      Lý thuyết RAG & XGBoost + câu hỏi thường gặp
+
+
+---------------------------------------------------------------------
+3. CÔNG NGHỆ SỬ DỤNG VÀ LÝ DO CHỌN
+---------------------------------------------------------------------
+FRONTEND
+  - React 19: thư viện UI theo component; state (useState) và side-effect
+    (useEffect) giúp giao diện tự cập nhật khi dữ liệu đổi.
+  - Vite 8: công cụ dev/build rất nhanh (dev server khởi động < 1 giây,
+    hot reload khi sửa code).
+  - React Router 7: điều hướng nhiều trang trong một ứng dụng một trang (SPA):
+    /, /product/:id, /search, /cart, /checkout, /auth, /profile, /my-orders, /admin.
+  - Tailwind CSS 3: viết style bằng class tiện ích ngay trong JSX
+    (vd: "bg-red-600 text-white rounded-lg"), không cần file CSS riêng.
+  - Oxlint: kiểm tra lỗi code JavaScript (lint).
+
+BACKEND
+  - Node.js + Express 5: framework web phổ biến, nhẹ, dễ chia route.
+    Express 5 tự bắt lỗi của hàm async.
+  - pg (node-postgres): driver PostgreSQL, dùng connection pool và
+    câu truy vấn tham số hoá ($1, $2...) để chống SQL injection.
+  - cors: cho phép frontend (khác domain) gọi API.
+  - dotenv: đọc biến môi trường từ file .env.local.
+  - nodemon: tự khởi động lại server khi sửa code (môi trường dev).
+
+CƠ SỞ DỮ LIỆU
+  - PostgreSQL: CSDL quan hệ mạnh, hỗ trợ transaction, ràng buộc khoá ngoại.
+  - Neon: PostgreSQL serverless trên cloud, có gói miễn phí, tự ngủ khi không
+    dùng, hỗ trợ extension pgvector.
+  - pgvector: extension cho phép lưu cột kiểu vector(768) và tìm kiếm theo
+    khoảng cách cosine bằng toán tử <=>.
+
+AI / MACHINE LEARNING
+  - Google Gemini API:
+      + gemini-embedding-001: biến văn bản thành vector 768 chiều.
+      + gemini-3.5-flash-lite (cấu hình được qua GEMINI_CHAT_MODEL): LLM sinh
+        câu trả lời, hỗ trợ "structured output" (trả JSON theo schema).
+  - Python 3.11 + XGBoost 3.x: mô hình gradient boosting cho dữ liệu dạng bảng.
+  - scikit-learn: chia tập train/test, cross-validation, chỉ số MAE/MAPE/R²,
+    mô hình cơ sở Ridge.
+  - pandas: xử lý dữ liệu bảng. psycopg: Python kết nối PostgreSQL.
+
+TRIỂN KHAI
+  - GitHub: quản lý mã nguồn, làm việc nhóm qua nhánh và pull request.
+  - Vercel: host frontend (file tĩnh) và backend (serverless function),
+    tự deploy lại mỗi khi push lên nhánh main.
+
+
+---------------------------------------------------------------------
+4. CƠ SỞ DỮ LIỆU (PostgreSQL trên Neon)
+---------------------------------------------------------------------
+4.1 Chín bảng nghiệp vụ (tạo bởi seed.js, theo sơ đồ ERD)
+  users          user_id, full_name, email (UNIQUE), password_hash, phone,
+                 address, role ('user' | 'admin'), created_at, updated_at
+  brands         brand_id, brand_name (UNIQUE)
+  categories     category_id, category_name (UNIQUE): Gaming, General,
+                 Business, Ultrabook, Creator
+  products       product_id, name, model, brand_id → brands, category_id →
+                 categories, price_egp, price_vnd, image_url, stock_quantity,
+                 cpu, gpu, gpu_vram_gb, ram_gb, ssd_gb, hdd_gb, screen_size_in,
+                 panel_type, resolution, refresh_rate_hz, weight_kg,
+                 battery_wh, operating_system, description, search_text
+  carts, cart_items   (có sẵn trong lược đồ; giỏ hàng hiện giữ ở trình duyệt)
+  orders         order_id, user_id → users, total_amount, status
+                 ('Chờ duyệt'...), shipping_address, phone, created_at
+  order_items    order_item_id, order_id → orders (CASCADE), product_id,
+                 quantity, unit_price
+  staging_laptops  bảng trung gian chứa dữ liệu thô từ CSV (toàn TEXT)
+
+4.2 Hai bảng cho AI (chỉ THÊM, không sửa bảng cũ)
+  product_embeddings  (migrations/001)
+     product_id (PK, → products), embedding vector(768), model,
+     source_hash (SHA-256 của văn bản nguồn), updated_at
+  price_predictions   (migrations/002)
+     product_id (PK, → products), predicted_price_vnd, price_ratio
+     (= giá thật / giá dự đoán), price_label ('good'|'fair'|'high'),
+     model_version, updated_at
+
+4.3 seed.js hoạt động thế nào
+  1) DROP các bảng cũ rồi CREATE lại 9 bảng (nên CHỈ chạy trên DB trống).
+  2) Tạo tài khoản admin mặc định: admin@gmail.com / 123456.
+  3) Đọc CSV bằng hàm parseCSVLine tự viết (xử lý dấu phẩy nằm trong ngoặc
+     kép), nạp từng dòng vào staging_laptops.
+  4) Chuẩn hoá: INSERT DISTINCT tên hãng vào brands, phân khúc vào categories.
+  5) INSERT ... SELECT từ staging sang products, JOIN để lấy brand_id,
+     category_id; ép kiểu số (NULLIF(...,'')::NUMERIC); quy đổi giá:
+     price_vnd = price_egp × 500; tồn kho mặc định 10.
+  Toàn bộ chạy trong một transaction (BEGIN/COMMIT, lỗi thì ROLLBACK).
+
+
+---------------------------------------------------------------------
+5. BACKEND – GIẢI THÍCH TỪNG FILE
+---------------------------------------------------------------------
+5.1 db.js
+  - Nạp biến môi trường từ ../.env.local, ./.env.local, .env.
+  - new Pool({ connectionString: DATABASE_URL, ssl: { rejectUnauthorized:false } })
+    → một "bể kết nối" dùng lại nhiều lần, tránh mở kết nối mới cho mỗi request.
+  - Thử kết nối một lần khi khởi động và in "Đã kết nối thành công tới Neon".
+
+5.2 server.js
+  - app.use(cors()), app.use(express.json()) để đọc body JSON.
+  - Gắn route: /api/products, /api/users, /api/orders, /api/ai, /api/cart.
+  - /api/health trả {ok:true}, dùng kiểm tra sau khi deploy.
+  - if (require.main === module) app.listen(5000): chỉ mở cổng khi chạy trực
+    tiếp bằng npm run dev. Trên Vercel, file api/index.js require app này và
+    Vercel tự chạy nó như một serverless function.
+  - module.exports = app.
+
+5.3 routes/productRoutes.js
+  - BASE_PRODUCT_SELECT: SELECT p.* JOIN brands, categories; đặt bí danh
+    id, price, image, brand, category cho tiện phía frontend.
+  - PRICED_PRODUCT_SELECT: giống trên nhưng LEFT JOIN thêm price_predictions
+    để lấy predicted_price_vnd, price_ratio, price_label.
+  - selectProducts(tail, params): thử câu có JOIN dự đoán; nếu lỗi mã 42P01
+    (bảng chưa tồn tại – chưa chạy XGBoost) thì chạy lại câu cơ bản
+    → web vẫn chạy kể cả khi chưa train mô hình.
+  - GET /           danh sách; ?search= tìm theo LIKE trên name/search_text.
+  - GET /:id        chi tiết 1 sản phẩm.
+  - POST /          (admin) thêm sản phẩm: tự tạo brand/category nếu chưa có
+                    (INSERT ... ON CONFLICT ... RETURNING id), ghi sản phẩm,
+                    tạo search_text, rồi gọi indexOneById() tạo embedding ngay
+                    để sản phẩm mới tìm được bằng AI.
+  - DELETE /:id     (admin) xoá sản phẩm.
+
+5.4 routes/userRoutes.js
+  - POST /register: nếu nhập username không có @ thì tự thêm "@gmail.com";
+    kiểm tra email trùng; role luôn là 'user' (không cho tự đăng ký admin).
+  - POST /login: so khớp email (hoặc phần trước @) và mật khẩu.
+  - PUT /:id: cập nhật hồ sơ (COALESCE giữ giá trị cũ nếu không gửi).
+  - POST /change-password: kiểm tra mật khẩu cũ, mới ≥ 6 ký tự và khác cũ.
+  - GET /, DELETE /:id: dành cho admin.
+
+5.5 services/cart.js + routes/cartRoutes.js  (tính tiền phía server)
+  - normalizeItems(raw): kiểm tra mảng 1–50 phần tử, id là số nguyên dương,
+    số lượng 1–20; gộp các dòng trùng sản phẩm. Sai → CartError (HTTP 400).
+  - priceItems(db, items): với mỗi sản phẩm, ĐỌC GIÁ TỪ DATABASE (không tin giá
+    trình duyệt gửi lên), kiểm tra tồn kho, tính subtotal và tổng.
+  - POST /api/cart/calculate: trả báo giá cho trang Checkout.
+  Ý nghĩa bảo mật: người dùng không thể sửa giá trong trình duyệt để mua rẻ.
+
+5.6 routes/orderRoutes.js
+  - POST /: đặt hàng trong một TRANSACTION:
+      BEGIN → priceItems (giá từ DB) → INSERT orders (status 'Chờ duyệt')
+      → INSERT từng order_items → COMMIT. Lỗi bất kỳ → ROLLBACK
+      (không bao giờ có đơn "nửa vời").
+  - GET /user/:userId: đơn của một khách (trang Đơn mua).
+  - GET /: (admin) tất cả đơn, kèm danh sách sản phẩm trong đơn.
+  - PUT /:id/status, DELETE /:id: (admin) duyệt/huỷ/xoá đơn.
+
+5.7 scripts/migrate.js, scripts/indexEmbeddings.js
+  - migrate.js: chạy 001_product_embeddings.sql (CREATE EXTENSION vector,
+    CREATE TABLE IF NOT EXISTS product_embeddings).
+  - indexEmbeddings.js: duyệt mọi sản phẩm, gọi indexProduct(); nghỉ 350 ms
+    giữa các lần gọi để không vượt giới hạn gói miễn phí; gặp HTTP 429 thì
+    dừng, chạy lại sẽ làm tiếp phần còn thiếu.
+
+
+---------------------------------------------------------------------
+6. PHẦN AI 1: RAG – TRỢ LÝ TƯ VẤN & TÌM KIẾM NGỮ NGHĨA
+---------------------------------------------------------------------
+6.1 Ý tưởng
+  LLM không biết cửa hàng đang bán gì nên dễ "bịa" (hallucination).
+  RAG = Retrieval-Augmented Generation:
+     (R) Truy xuất laptop liên quan từ database
+     (A) Đưa danh sách đó vào prompt
+     (G) LLM viết câu trả lời CHỈ dựa trên danh sách đó.
+
+6.2 services/gemini.js
+  - request(model, action, body): gọi REST
+    https://generativelanguage.googleapis.com/v1beta/models/{model}:{action}
+    với header x-goog-api-key (key chỉ nằm ở backend, không lộ ra trình duyệt).
+    Timeout 15 giây; gặp HTTP 429/500/503 (quá tải tạm thời) thì thử lại
+    tối đa 3 lần, chờ 0,6 s rồi 1,2 s. Không log key hay nội dung request.
+  - generateJson(systemPrompt, userPrompt, schema): gọi generateContent với
+    temperature: 0 (ổn định), responseMimeType "application/json" và
+    responseSchema → Gemini BẮT BUỘC trả JSON đúng cấu trúc → JSON.parse.
+  - embedText(text, taskType): gọi embedContent với gemini-embedding-001,
+    outputDimensionality 768. taskType = RETRIEVAL_DOCUMENT khi nhúng sản phẩm,
+    RETRIEVAL_QUERY khi nhúng câu hỏi (tối ưu cho bài toán tìm kiếm).
+
+6.3 services/indexProduct.js (chuẩn bị dữ liệu)
+  - productText(p): ghép thông tin thành một đoạn văn tiếng Anh:
+    "Product: ... Brand: ... CPU: ... GPU: ... RAM: 16 GB ... Weight: 1.6 kg..."
+  - Tính SHA-256 của đoạn văn; nếu trùng hash đã lưu và cùng model → bỏ qua
+    (không tốn API cho sản phẩm không đổi).
+  - Ngược lại: embedText → UPSERT vào product_embeddings (ON CONFLICT DO UPDATE).
+
+6.4 services/catalogSearch.js (lõi truy xuất)
+  a) extractIntent(query, history): Gemini đọc câu khách (kèm tối đa 4 lượt
+     hội thoại trước) và trả JSON theo INTENT_SCHEMA:
+       keywords, brand, category, min/max_price_vnd, min_ram_gb, min_ssd_gb,
+       max_weight_kg, min_refresh_rate_hz, dedicated_gpu
+     Prompt dặn: chỉ lấy điều kiện khách NÓI RÕ, "15 triệu" = 15000000,
+     brand/category chỉ nhận trong danh sách cho phép.
+  b) normalizeIntent(): kiểm tra lại đầu ra của LLM (brand/category phải hợp lệ,
+     số phải dương và trong giới hạn) → không tin tuyệt đối vào LLM.
+  c) fallbackIntent(): khi không có key/Gemini lỗi, dùng regex trên câu đã bỏ
+     dấu tiếng Việt để bắt "dưới 20 triệu", "RAM 16GB", tên hãng...
+  d) filterSql(intent, params): biến intent thành mệnh đề WHERE với tham số
+     $1, $2... (luôn có "stock_quantity > 0"); dedicated_gpu → GPU có
+     NVIDIA/Radeon RX/Arc.
+  e) searchCatalog(query, intent):
+     - Semantic: embed intent.keywords → truy vấn
+         SELECT ..., 1 - (e.embedding <=> $vec) AS similarity
+         FROM products p JOIN product_embeddings e ...
+         WHERE <bộ lọc cứng>
+         ORDER BY e.embedding <=> $vec LIMIT 20
+       (<=> là khoảng cách cosine của pgvector; nhỏ = giống nhau).
+       → mode "semantic".
+     - Fallback: tìm ILIKE theo từ khoá trên name/search_text → mode "keyword".
+  Kết hợp "lọc cứng bằng SQL + xếp hạng ngữ nghĩa bằng vector" gọi là
+  hybrid search: đảm bảo đúng ngân sách/RAM mà vẫn hiểu nghĩa câu hỏi.
+
+6.5 routes/aiRoutes.js
+  - POST /api/ai/search {query}: extractIntent → searchCatalog → trả
+    {products, mode, intent, aiAvailable}. Trang SearchPage dùng API này.
+  - POST /api/ai/assistant {message, history}:
+      1) Kiểm tra đầu vào (2–500 ký tự), lọc history (tối đa 6 tin, 500 ký tự).
+      2) extractIntent + searchCatalog → lấy 5 ứng viên.
+      3) Gửi Gemini prompt: "Chỉ dùng danh sách JSON được cung cấp, không thêm
+         sản phẩm/giá/thông số, tối đa 3 gợi ý, trả lời tiếng Việt" cùng
+         dữ liệu 5 máy (id, tên, giá, CPU, GPU, RAM, SSD, cân nặng, pin...).
+      4) Gemini trả JSON {intro, recommendations[{product_id, reason}], follow_up}.
+      5) RÀO CHẮN: chỉ giữ product_id có trong 5 ứng viên; sản phẩm và giá lấy
+         lại từ DB (byId map) → LLM không thể bịa máy hay sửa giá.
+      6) Nếu Gemini lỗi → vẫn trả 3 máy tìm được với lý do mặc định.
+
+
+---------------------------------------------------------------------
+7. PHẦN AI 2: XGBOOST – MÔ HÌNH DỰ ĐOÁN GIÁ HỢP LÝ
+---------------------------------------------------------------------
+7.1 Bài toán: hồi quy có giám sát. Đầu vào: thông số. Đầu ra: giá (VND).
+    Dùng để so giá thật với giá "đáng có" theo cấu hình → gắn nhãn.
+
+7.2 ml/train_price_model.py – từng bước
+  (1) Tải dữ liệu: từ PostgreSQL (DATABASE_URL trong backend/.env.local)
+      hoặc từ CSV với cờ --csv (chỉ đánh giá, không ghi DB).
+  (2) Feature engineering – build_features():
+      - cpu_features(): cpu_tier 1–5 (Celeron→1 ... i9/Ultra 9→5), cpu_gen
+        (thế hệ), cpu_hx (dòng hiệu năng cao), cpu_low_power (dòng U).
+      - gpu_features(): RTX 4060 → gpu_series=40, gpu_tier=2; gpu_dedicated.
+      - Số có sẵn: gpu_vram_gb, ram_gb, ssd_gb, hdd_gb, screen_size_in,
+        refresh_rate_hz, weight_kg, battery_wh.
+      - resolution_mp: 2560×1440 → 3,69 megapixel.
+      - panel_oled, panel_miniled, os_windows_pro (0/1).
+      - One-hot encoding cho hãng (brand_*) và phân khúc (cat_*).
+  (3) Mục tiêu y = log1p(giá): giá lệch phải mạnh, dùng log để mô hình học
+      sai số tương đối (%), giảm ảnh hưởng của vài máy rất đắt.
+  (4) Mô hình XGBRegressor: n_estimators=600 cây, learning_rate=0.05,
+      max_depth=5, subsample=0.8, colsample_bytree=0.8, min_child_weight=2,
+      reg_lambda=1.0, random_state=42.
+  (5) Đánh giá: chia 80/20; so với 2 baseline (đoán giá trung vị, hồi quy
+      tuyến tính Ridge). Chỉ số: MAE (VND), MAPE (%), R².
+  (6) Out-of-fold 5-fold: mỗi sản phẩm được dự đoán bởi mô hình KHÔNG thấy nó
+      khi huấn luyện → tránh rò rỉ dữ liệu (data leakage).
+  (7) Gắn nhãn: ratio = giá thật / giá dự đoán
+         ratio < 0.90 → "good" (Giá tốt)
+         ratio > 1.15 → "high" (Giá cao hơn thị trường)
+         còn lại      → "fair" (Giá hợp lý)
+  (8) Huấn luyện mô hình cuối trên toàn bộ dữ liệu, lưu price_model.json,
+      feature importance, metrics.json; ghi 1.013 dòng vào price_predictions
+      bằng UPSERT (ON CONFLICT DO UPDATE).
+
+7.3 Kết quả (trên dữ liệu thật trong Neon, 1.013 laptop)
+   Mô hình                     MAE           MAPE     R²
+   Đoán giá trung vị           10,14 triệu   43,9%   -0,08
+   Hồi quy tuyến tính Ridge     5,73 triệu   21,7%    0,68
+   XGBoost                      3,93 triệu   16,0%    0,86
+   5-fold CV toàn bộ: R² 0,91, MAPE 15,0%
+   Nhãn: 267 Giá tốt · 543 Hợp lý · 203 Giá cao
+   Đặc trưng quan trọng nhất: RAM, VRAM GPU, SSD, cấp CPU, hãng, độ phân giải.
+
+7.4 Vì sao XGBoost
+   Dữ liệu dạng bảng, quan hệ phi tuyến, có giá trị thiếu → cây boosting xử lý
+   tốt; regularization + subsampling chống overfitting; huấn luyện nhanh.
+   (Lý thuyết chi tiết: docs/AI_RAG_XGBOOST.md)
+
+
+---------------------------------------------------------------------
+8. FRONTEND – GIẢI THÍCH TỪNG FILE
+---------------------------------------------------------------------
+8.1 main.jsx: render <App/> vào thẻ #root, bọc StrictMode.
+
+8.2 lib/api.js
+   API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000"
+   → mọi lệnh fetch dùng `${API_URL}/api/...`; trên Vercel chỉ cần đặt biến.
+
+8.3 App.jsx (khung chung của web)
+   - State: cart (giỏ hàng), user (lấy từ localStorage), searchInput,
+     searchSuggestions.
+   - Thanh tìm kiếm: mỗi lần gõ gọi /api/products?search= để hiện 4 gợi ý;
+     Enter → chuyển tới /search?q=... (có encodeURIComponent).
+   - addToCart(product): bắt đăng nhập trước; kiểm tra tồn kho; tăng số lượng
+     nếu đã có trong giỏ.
+   - updateQuantity, removeFromCart, clearCart.
+   - Header đỏ: logo, MegaMenu "Danh mục", ô tìm kiếm, tài khoản (Tài khoản của
+     tôi / Đơn mua / Đăng xuất), "Admin Panel" nếu role admin, nút giỏ hàng.
+   - <Routes>: định nghĩa các trang. Cuối trang gắn <ShoppingAssistant/>.
+
+8.4 pages/Home.jsx
+   - Tải toàn bộ sản phẩm 1 lần, lọc PHÍA TRÌNH DUYỆT bằng useEffect:
+     hãng (slider logo), nhu cầu (Gaming/Creator/Doanh nhân/Ultrabook/Văn phòng),
+     CPU, GPU (RTX 20–50), RAM, SSD, kích thước màn hình, tần số quét.
+   - Mới: ô "🤖 Chỉ máy giá tốt (AI)" (chỉ hiện khi API có price_label)
+     → lọc price_label === "good".
+   - Thẻ sản phẩm: ảnh, tên, RAM/SSD, giá, <PriceBadge/>, nút Thêm vào giỏ.
+
+8.5 pages/Detail.jsx: GET /api/products/:id; hiển thị ảnh, giá, tồn kho,
+   <PriceInsight/> (khung "Định giá AI": nhãn + giá hợp lý dự đoán + giải thích),
+   bảng cấu hình chi tiết, nút thêm vào giỏ.
+
+8.6 pages/SearchPage.jsx: gửi POST /api/ai/search; hiển thị dòng "Tìm kiếm ngữ
+   nghĩa bằng AI" hoặc "tìm kiếm từ khoá", các thẻ điều kiện AI đã hiểu
+   (max_price_vnd, min_ram_gb...), lưới kết quả. Dùng AbortController để huỷ
+   request cũ khi người dùng đổi từ khoá.
+
+8.7 pages/Cart.jsx: danh sách giỏ, tăng/giảm/xoá, tổng tạm tính.
+
+8.8 pages/Checkout.jsx: điền sẵn họ tên/SĐT/địa chỉ từ hồ sơ; gọi
+   /api/cart/calculate để lấy TỔNG TIỀN DO SERVER TÍNH; gửi POST /api/orders;
+   thành công → xoá giỏ, chuyển sang Đơn mua.
+
+8.9 pages/Auth.jsx: đăng nhập/đăng ký, lưu user vào localStorage.
+    pages/Profile.jsx: sửa hồ sơ, đổi mật khẩu.
+    pages/MyOrders.jsx: GET /api/orders/user/:id.
+    pages/Admin.jsx: 3 tab Đơn hàng (mặc định) / Sản phẩm / Người dùng;
+    đổi trạng thái đơn (Chờ duyệt → Đang giao → Đã giao, hoặc Đã hủy),
+    xoá đơn, thêm/xoá sản phẩm, xoá người dùng.
+
+8.10 components/ShoppingAssistant.jsx (khung chat "Tư vấn AI")
+   - Nút nổi góc phải; mở ra khung chat.
+   - send(): thêm tin người dùng, gửi {message, history (6 tin gần nhất)} tới
+     /api/ai/assistant; hiển thị intro, các thẻ gợi ý (tên – link chi tiết,
+     giá, lý do, nút Thêm vào giỏ) và câu hỏi tiếp theo; báo khi đang dùng
+     chế độ từ khoá.
+
+8.11 components/PriceBadge.jsx
+   - PriceBadge: nhãn nhỏ "Giá tốt -17%" (xanh), "Giá hợp lý" (xám),
+     "Giá cao hơn TT +18%" (cam). Không có dữ liệu → không hiện.
+   - PriceInsight: khung chi tiết trên trang sản phẩm.
+
+8.12 components/MegaMenu.jsx: gom sản phẩm theo hãng → phân khúc, hover để xem
+   tối đa 5 máy mỗi nhóm.
+
+
+---------------------------------------------------------------------
+9. LUỒNG DỮ LIỆU ĐẦU-CUỐI (VÍ DỤ)
+---------------------------------------------------------------------
+9.1 Khách chat: "laptop nhẹ đi học pin tốt dưới 20 triệu"
+  1) ShoppingAssistant gửi POST /api/ai/assistant.
+  2) extractIntent → Gemini trả
+     {keywords:"lightweight student laptop good battery", max_price_vnd:20000000}
+  3) filterSql → WHERE stock_quantity > 0 AND price_vnd <= $1
+  4) embedText(keywords, RETRIEVAL_QUERY) → vector 768 chiều
+  5) pgvector: ORDER BY embedding <=> vector LIMIT 20 → lấy 5 máy đầu
+  6) Gemini nhận 5 máy (JSON) → viết intro + lý do cho tối đa 3 máy
+  7) Backend lọc product_id hợp lệ, gắn dữ liệu thật từ DB → trả về
+  8) Giao diện hiện 3 thẻ máy (vd: Lenovo IdeaPad Slim 3, 1,62 kg, ~8 triệu)
+
+9.2 Khách đặt hàng
+  Checkout → /api/cart/calculate (giá từ DB) → POST /api/orders →
+  transaction (orders + order_items) → MyOrders hiển thị "Chờ duyệt" →
+  Admin đổi trạng thái → khách thấy cập nhật.
+
+9.3 Nhãn giá
+  (offline) train_price_model.py → bảng price_predictions →
+  GET /api/products LEFT JOIN price_predictions → PriceBadge hiển thị.
+
+
+---------------------------------------------------------------------
+10. TRIỂN KHAI (VERCEL + NEON)
+---------------------------------------------------------------------
+  - 2 project Vercel từ cùng repo:
+      Backend:  Root Directory = backend, Framework = Other.
+                backend/api/index.js export app Express; vercel.json chuyển
+                mọi đường dẫn vào function này, maxDuration 60 s (đủ cho Gemini).
+      Frontend: Root Directory = frontend, Framework = Vite.
+                vercel.json rewrite mọi đường dẫn về index.html để mở thẳng
+                /product/7 hay tải lại trang không bị lỗi 404.
+  - Biến môi trường:
+      Backend:  DATABASE_URL (Secret), GEMINI_API_KEY (Secret),
+                GEMINI_CHAT_MODEL = gemini-3.5-flash-lite
+      Frontend: VITE_API_URL = URL backend (loại Config, vì được nhúng vào code
+                chạy trên trình duyệt; sửa xong phải Redeploy).
+  - Embedding và nhãn giá đã nằm sẵn trong Neon → Vercel không cần chạy ML.
+  - Không dùng PGlite: Vercel serverless có ổ đĩa tạm, dữ liệu đơn hàng/tài
+    khoản sẽ mất; Neon là CSDL bền vững, dùng chung cho cả nhóm.
+
+
+---------------------------------------------------------------------
+11. BẢO MẬT, KIỂM THỬ, HẠN CHẾ
+---------------------------------------------------------------------
+Đã làm:
+  - Truy vấn SQL tham số hoá ($1...) → chống SQL injection.
+  - Giá/tổng tiền luôn tính lại ở server từ DB.
+  - API key Gemini chỉ ở backend; .env.local nằm trong .gitignore.
+  - Đăng ký không thể tự đặt role admin.
+  - LLM bị rào: chỉ dùng dữ liệu được cung cấp, kiểm tra ID, giá lấy từ DB.
+  - Test tự động (npm test, 7 test): giỏ hàng bỏ qua giá từ trình duyệt,
+    từ chối số lượng sai/thiếu hàng, intent giữ đúng điều kiện, SQL dùng tham
+    số, fallback hiểu ngân sách tiếng Việt, không tự suy diễn ngân sách,
+    output Gemini chỉ xử lý ở backend.
+Hạn chế:
+  - Mật khẩu lưu dạng chữ thường (chưa băm bcrypt); API admin chưa kiểm tra
+    quyền phía server (chưa có JWT/session).
+  - Giá quy đổi từ dữ liệu nước ngoài (EGP × 500) → chưa phản ánh thị trường VN.
+  - Gemini gói miễn phí có giới hạn tốc độ (đã có thử lại + fallback).
+  - XGBoost chỉ dựa trên thông số, không tính khuyến mãi, độ bền, thương hiệu
+    dòng máy.
+
+
+---------------------------------------------------------------------
+12. LỆNH CHẠY DỰ ÁN
+---------------------------------------------------------------------
+  backend/.env.local:
+      DATABASE_URL=postgresql://...      (Neon → Connect)
+      GEMINI_API_KEY=...                  (aistudio.google.com/apikey)
+      GEMINI_CHAT_MODEL=gemini-3.5-flash-lite
+
+  cd backend && npm install
+  npm run migrate        # bật pgvector, tạo bảng embedding (chỉ thêm)
+  npm run index:ai       # tạo embedding cho sản phẩm (chạy lại được)
+  npm run dev            # http://localhost:5000
+  npm test               # chạy test
+
+  cd frontend && npm install && npm run dev   # http://localhost:5173
+
+  # Huấn luyện XGBoost (Python 3.11)
+  py -3.11 -m venv ml/.venv
+  ml/.venv/Scripts/python -m pip install -r ml/requirements.txt
+  ml/.venv/Scripts/python ml/train_price_model.py --csv   # chỉ đánh giá
+  ml/.venv/Scripts/python ml/train_price_model.py         # ghi price_predictions
+
+  KHÔNG chạy lại backend/seed.js trên database đang dùng (sẽ xoá toàn bộ bảng).
+
+=========================== HẾT ===========================

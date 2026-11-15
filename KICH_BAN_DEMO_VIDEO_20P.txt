@@ -1,0 +1,397 @@
+=====================================================================
+  KỊCH BẢN VIDEO DEMO – USEYOURMIND LAPTOP STORE
+  Web bán laptop + Trợ lý AI (RAG) + Định giá AI (XGBoost)
+  Thời lượng mục tiêu: ~20 phút
+=====================================================================
+
+Cách đọc:
+  [MÀN HÌNH]  = cần quay / hiển thị gì
+  [LỜI THOẠI] = nội dung đọc (đọc chậm, rõ; ngắt nghỉ tự nhiên)
+  Mốc thời gian là ước lượng; phần demo có thể dài/ngắn tuỳ tốc độ thao tác.
+
+PHÂN BỔ THỜI GIAN
+  00:00  Phần 1  Mở đầu                                  1:00
+  01:00  Phần 2  Bài toán & giải pháp                    1:30
+  02:30  Phần 3  Công nghệ & kiến trúc                   3:00
+  05:30  Phần 4  Demo chức năng thương mại điện tử       4:00
+  09:30  Phần 5  AI #1 – RAG: lý thuyết + code + demo    4:30
+  14:00  Phần 6  AI #2 – XGBoost: lý thuyết + code + demo 3:30
+  17:30  Phần 7  Triển khai Vercel + Neon                1:15
+  18:45  Phần 8  Hạn chế, hướng phát triển, kết          1:15
+
+CHUẨN BỊ TRƯỚC KHI QUAY
+  [ ] Backend + frontend đang chạy (localhost hoặc bản Vercel).
+  [ ] Mở sẵn tab: web, VS Code (thư mục dự án), Neon Console (Tables),
+      Vercel Dashboard, file ml/artifacts/metrics.json.
+  [ ] Đăng xuất tài khoản trên web; giỏ hàng trống.
+  [ ] Thử chat 1 câu trước khi quay để "đánh thức" Gemini và Neon
+      (lần gọi đầu có thể chậm vài giây).
+  [ ] Ghi nhớ 1 máy "Giá tốt" để mở nhanh (vd: Dell Alienware 16 Aurora
+      AC16250 bản 28.999.500 ₫ – nhãn Giá tốt -17%).
+  [ ] Phóng to trình duyệt 110–125%, tắt thông báo hệ thống.
+
+
+====================================================================
+PHẦN 1 – MỞ ĐẦU                                        00:00 – 01:00
+====================================================================
+[MÀN HÌNH] Trang chủ web, cuộn chậm từ "Thương hiệu nổi bật" xuống
+"LAPTOP NỔI BẬT".
+
+[LỜI THOẠI]
+Xin chào thầy và các bạn. Nhóm em xin trình bày đồ án môn IT in E-commerce:
+UseYourMind – website bán laptop trực tuyến.
+
+Ngoài các chức năng của một trang thương mại điện tử như xem sản phẩm,
+giỏ hàng, đặt hàng và quản trị, nhóm em tích hợp thêm hai thành phần trí
+tuệ nhân tạo: một là trợ lý tư vấn dùng mô hình ngôn ngữ lớn theo kiến trúc
+RAG, hai là mô hình máy học XGBoost để định giá laptop.
+
+Video gồm tám phần: bài toán, công nghệ và kiến trúc, demo các chức năng
+mua hàng, sau đó đi sâu vào hai phần AI, cách triển khai, và cuối cùng là
+hạn chế cùng hướng phát triển.
+
+
+====================================================================
+PHẦN 2 – BÀI TOÁN & GIẢI PHÁP                           01:00 – 02:30
+====================================================================
+[MÀN HÌNH] Cột "Bộ lọc tìm kiếm" bên trái (CPU, GPU, RAM, SSD...).
+
+[LỜI THOẠI]
+Khi mua laptop online, khách hàng thường gặp hai khó khăn.
+
+Thứ nhất, thông số quá nhiều. Nhìn vào cột bộ lọc này: Core i5 hay i7, RTX
+4050 hay 4060, RAM 16 hay 32 GB. Người không rành công nghệ không biết mình
+cần gì, họ chỉ nói được kiểu "em cần máy nhẹ để đi học, dưới 20 triệu".
+
+Thứ hai, khó biết giá có hợp lý không. Hai máy cấu hình gần giống nhau có
+thể chênh nhau vài triệu.
+
+Nhóm em giải quyết bằng hai thành phần AI. Trợ lý tư vấn cho phép khách
+hỏi bằng ngôn ngữ tự nhiên và nhận gợi ý từ đúng sản phẩm đang bán. Mô hình
+định giá cho biết máy nào đang có giá tốt so với các máy cùng cấu hình.
+
+
+====================================================================
+PHẦN 3 – CÔNG NGHỆ & KIẾN TRÚC                          02:30 – 05:30
+====================================================================
+[MÀN HÌNH] Slide sơ đồ kiến trúc:
+   React (Vercel) ─► Express API (Vercel serverless) ─► PostgreSQL (Neon)
+                                    │                    + pgvector
+                                    └─► Gemini API       + price_predictions
+   Python XGBoost (offline) ───────────────────────────► ghi vào Neon
+
+[LỜI THOẠI]
+Hệ thống theo kiến trúc ba tầng.
+
+[MÀN HÌNH] VS Code – mở frontend/package.json, rồi frontend/src/App.jsx.
+
+[LỜI THOẠI]
+Frontend viết bằng React 19, build bằng Vite. Điều hướng giữa các trang
+dùng React Router, giao diện dùng Tailwind CSS. Toàn bộ địa chỉ backend được
+gom vào một file lib/api.js, đọc từ biến môi trường VITE_API_URL, nên khi
+triển khai chỉ cần đổi biến này.
+
+[MÀN HÌNH] Mở backend/server.js và thư mục backend/routes.
+
+[LỜI THOẠI]
+Backend là Node.js với Express 5, chia thành năm nhóm API: products cho
+sản phẩm, users cho tài khoản, orders cho đơn hàng, cart để tính tiền giỏ
+hàng, và ai cho tìm kiếm và trợ lý thông minh.
+
+[MÀN HÌNH] Neon Console – mở Tables: products, orders, order_items, users,
+brands, categories, product_embeddings, price_predictions.
+
+[LỜI THOẠI]
+Cơ sở dữ liệu là PostgreSQL, host trên Neon. Dữ liệu gốc là 1.013 laptop
+từ file CSV, được script seed.js chuẩn hoá thành chín bảng theo sơ đồ ERD:
+users, brands, categories, products, carts, cart_items, orders, order_items
+và bảng tạm staging.
+
+Cho phần AI, nhóm thêm hai bảng: product_embeddings lưu vector của từng
+laptop, nhờ extension pgvector; và price_predictions lưu giá dự đoán của mô
+hình XGBoost. Hai bảng này chỉ được thêm vào, không làm thay đổi dữ liệu cũ.
+
+[MÀN HÌNH] Mở backend/services/cart.js, chỉ vào hàm priceItems.
+
+[LỜI THOẠI]
+Một điểm về bảo mật nghiệp vụ: giá tiền luôn được tính lại ở server. Khi
+đặt hàng, backend chỉ nhận mã sản phẩm và số lượng, còn giá thì đọc từ
+database và kiểm tra tồn kho. Người dùng không thể sửa giá trên trình duyệt
+để mua rẻ. Việc tạo đơn chạy trong một transaction: lưu đơn và lưu từng sản
+phẩm trong đơn, lỗi ở bất kỳ bước nào thì huỷ toàn bộ.
+
+
+====================================================================
+PHẦN 4 – DEMO CHỨC NĂNG THƯƠNG MẠI ĐIỆN TỬ               05:30 – 09:30
+====================================================================
+--- 4.1 Duyệt sản phẩm (05:30 – 07:00) ---
+
+[MÀN HÌNH] Trang chủ. Bấm một logo hãng (vd: Dell) trong "Thương hiệu nổi
+bật", rồi bấm "Mỏng nhẹ - Ultrabook" trong "Nhu cầu sử dụng".
+
+[LỜI THOẠI]
+Đây là trang chủ. Khách có thể lọc theo hãng bằng thanh logo, hoặc theo nhu
+cầu sử dụng như Gaming, Đồ hoạ, Doanh nhân, Mỏng nhẹ và Văn phòng.
+
+[MÀN HÌNH] Bấm "Tất cả" để bỏ lọc. Ở cột trái tick "Intel Core i7",
+"RTX 40 Series", RAM "16GB".
+
+[LỜI THOẠI]
+Cột bên trái là bộ lọc kỹ thuật cho người rành: công nghệ CPU, card đồ hoạ,
+RAM, SSD, kích thước màn hình và tần số quét. Bộ lọc chạy ngay trên trình
+duyệt nên kết quả cập nhật tức thì, góc phải hiện số kết quả tìm thấy.
+
+[MÀN HÌNH] Rê chuột vào nút "Danh mục" trên header.
+
+[LỜI THOẠI]
+Menu Danh mục gom sản phẩm theo hãng và phân khúc, tiện cho khách muốn duyệt
+nhanh theo thương hiệu.
+
+--- 4.2 Chi tiết & giỏ hàng (07:00 – 08:30) ---
+
+[MÀN HÌNH] Bỏ các bộ lọc, bấm vào một sản phẩm → trang chi tiết.
+
+[LỜI THOẠI]
+Trang chi tiết hiển thị ảnh, giá, tình trạng còn hàng và cấu hình đầy đủ.
+Khung màu xanh "Định giá AI" em sẽ giải thích ở phần XGBoost.
+
+[MÀN HÌNH] Bấm "THÊM VÀO GIỎ HÀNG" khi chưa đăng nhập → chuyển sang trang
+đăng nhập. Đăng nhập (hoặc đăng ký nhanh một tài khoản khách).
+
+[LỜI THOẠI]
+Khi chưa đăng nhập, hệ thống yêu cầu đăng nhập trước khi mua. Tài khoản đăng
+ký mới luôn có quyền khách hàng, không thể tự đăng ký thành quản trị viên.
+
+[MÀN HÌNH] Thêm 2 sản phẩm vào giỏ, mở Giỏ hàng, tăng số lượng 1 máy.
+
+[LỜI THOẠI]
+Trong giỏ hàng, khách có thể tăng giảm số lượng, nhưng không vượt quá số
+lượng tồn kho.
+
+--- 4.3 Thanh toán & đơn hàng (08:30 – 09:30) ---
+
+[MÀN HÌNH] Bấm thanh toán → trang Checkout (thông tin điền sẵn) → Đặt hàng
+→ tự chuyển sang "Đơn mua", trạng thái "Chờ duyệt".
+
+[LỜI THOẠI]
+Ở trang thanh toán, thông tin giao hàng được điền sẵn từ hồ sơ. Tổng tiền
+hiển thị là con số do server tính. Bấm đặt hàng, đơn được lưu vào database
+và xuất hiện trong mục Đơn mua với trạng thái Chờ duyệt.
+
+[MÀN HÌNH] Đăng xuất, đăng nhập admin@gmail.com / 123456 → "Admin Panel"
+→ tab Đơn hàng → đổi đơn vừa đặt sang "Đang giao".
+
+[LỜI THOẠI]
+Với tài khoản quản trị, trang Admin có ba tab: Đơn hàng, Sản phẩm và Người
+dùng. Em chuyển đơn vừa đặt sang Đang giao, khách hàng sẽ thấy trạng thái
+cập nhật trong mục Đơn mua. Khi admin thêm một sản phẩm mới, hệ thống cũng
+tự tạo vector cho sản phẩm đó để trợ lý AI tìm thấy được ngay.
+
+
+====================================================================
+PHẦN 5 – AI #1: RAG – TRỢ LÝ TƯ VẤN                     09:30 – 14:00
+====================================================================
+--- 5.1 Lý thuyết (09:30 – 11:00) ---
+
+[MÀN HÌNH] Slide: (R) Retrieval → (A) Augmented → (G) Generation.
+
+[LỜI THOẠI]
+Phần AI thứ nhất là trợ lý tư vấn dùng mô hình ngôn ngữ lớn Gemini của
+Google.
+
+Vấn đề của LLM là nó không biết cửa hàng đang bán gì. Nếu hỏi thẳng, nó có
+thể bịa ra tên máy hoặc giá không tồn tại, hiện tượng này gọi là
+hallucination. Kiến trúc RAG, Retrieval-Augmented Generation, giải quyết
+bằng ba bước. Retrieval: tìm các laptop liên quan trong database. Augmented:
+đưa đúng các laptop đó vào prompt. Generation: LLM viết lời tư vấn chỉ dựa
+trên dữ liệu được cung cấp.
+
+[MÀN HÌNH] Slide: câu "máy nhẹ đi học" và mô tả "Ultrabook 1,2 kg, pin 70 Wh"
+→ hai vector gần nhau; công thức cos θ = A·B / (|A|·|B|).
+
+[LỜI THOẠI]
+Để tìm theo nghĩa thay vì theo từ khoá, nhóm dùng embedding. Mỗi laptop được
+mô tả thành một đoạn văn, rồi model gemini-embedding-001 biến đoạn văn đó
+thành một vector 768 chiều. Hai câu gần nghĩa sẽ cho hai vector gần nhau, đo
+bằng độ tương đồng cosine. Vì vậy "máy nhẹ đi học" vẫn tìm ra một chiếc
+Ultrabook dù không trùng chữ nào. Các vector được lưu ngay trong PostgreSQL
+nhờ extension pgvector.
+
+--- 5.2 Code (11:00 – 12:30) ---
+
+[MÀN HÌNH] backend/services/catalogSearch.js – cuộn qua INTENT_SCHEMA,
+extractIntent, filterSql, searchCatalog (dòng ORDER BY e.embedding <=> ...).
+
+[LỜI THOẠI]
+Luồng xử lý gồm bốn bước. Bước một, Gemini đọc câu hỏi và trả về JSON có cấu
+trúc theo schema này: ngân sách, hãng, RAM tối thiểu, có cần card rời
+không... Prompt dặn rõ chỉ lấy điều kiện khách nói ra, không tự suy diễn.
+Backend còn kiểm tra lại kết quả, ví dụ tên hãng phải nằm trong danh sách
+cho phép.
+
+Bước hai, các điều kiện cứng được chuyển thành câu SQL có tham số, vừa chống
+SQL injection vừa đảm bảo đúng ngân sách.
+
+Bước ba, phần mô tả nhu cầu được biến thành vector, và PostgreSQL sắp xếp
+các laptop theo khoảng cách cosine bằng toán tử này. Cách kết hợp lọc cứng
+với xếp hạng ngữ nghĩa được gọi là hybrid search.
+
+[MÀN HÌNH] backend/routes/aiRoutes.js – route /assistant, đoạn prompt và
+đoạn byId / filter(item => item.product).
+
+[LỜI THOẠI]
+Bước bốn, năm laptop tốt nhất được gửi cho Gemini dưới dạng JSON, kèm yêu
+cầu chỉ dùng danh sách này và gợi ý tối đa ba máy. Để chống bịa, backend chỉ
+giữ những mã sản phẩm có trong danh sách, còn giá hiển thị thì lấy lại từ
+database chứ không lấy từ chữ của LLM. Nếu Gemini lỗi hoặc quá tải, hệ thống
+tự thử lại, rồi chuyển sang tìm kiếm từ khoá, nên web không bị gián đoạn.
+
+--- 5.3 Demo (12:30 – 14:00) ---
+
+[MÀN HÌNH] Bấm nút "Tư vấn AI". Gõ: "Tư vấn laptop nhẹ đi học pin tốt dưới
+20 triệu". Chờ kết quả.
+
+[LỜI THOẠI]
+Bây giờ em demo. Em hỏi: "Tư vấn laptop nhẹ đi học pin tốt dưới 20 triệu".
+Trợ lý trả về lời giới thiệu, ba máy kèm lý do cụ thể như cân nặng 1,6 kg,
+dung lượng pin, và một câu hỏi để tư vấn tiếp. Mỗi gợi ý đều là sản phẩm có
+thật trong cửa hàng, bấm vào là tới trang chi tiết, hoặc thêm thẳng vào giỏ.
+
+[MÀN HÌNH] Gõ tiếp: "gaming RTX màn 144Hz tầm 30 triệu".
+
+[LỜI THOẠI]
+Em hỏi tiếp một nhu cầu khác: "gaming RTX màn 144Hz tầm 30 triệu". Hệ thống
+hiểu bốn điều kiện: phân khúc Gaming, có card rời, màn từ 144 Hz và ngân
+sách khoảng 30 triệu, rồi gợi ý các máy phù hợp.
+
+[MÀN HÌNH] Đóng chat. Gõ vào thanh tìm kiếm trên header: "máy nhẹ đi học pin
+tốt" → Enter → trang kết quả.
+
+[LỜI THOẠI]
+Thanh tìm kiếm cũng dùng cùng cơ chế. Dòng này cho biết đang dùng "Tìm kiếm
+ngữ nghĩa bằng AI", và các thẻ bên dưới là điều kiện AI đã hiểu từ câu tìm
+kiếm.
+
+
+====================================================================
+PHẦN 6 – AI #2: XGBOOST – ĐỊNH GIÁ HỢP LÝ                14:00 – 17:30
+====================================================================
+--- 6.1 Lý thuyết (14:00 – 15:00) ---
+
+[MÀN HÌNH] Slide: dự_đoán = f0 + η·cây1(x) + η·cây2(x) + … + η·cây600(x)
+
+[LỜI THOẠI]
+Phần AI thứ hai là mô hình máy học dự đoán giá hợp lý của một laptop từ
+thông số kỹ thuật. Đây là bài toán hồi quy có giám sát.
+
+Nhóm dùng XGBoost, viết tắt của eXtreme Gradient Boosting. Ý tưởng là xây
+dựng lần lượt nhiều cây quyết định nhỏ: cây đầu dự đoán thô, mỗi cây sau học
+cách sửa phần sai số mà các cây trước để lại. Tổng của 600 cây cho ra dự
+đoán cuối cùng. XGBoost có thêm regularization và lấy mẫu ngẫu nhiên để
+chống học vẹt, tức overfitting, và tự xử lý dữ liệu bị thiếu. Thuật toán này
+rất mạnh với dữ liệu dạng bảng như thông số laptop.
+
+--- 6.2 Code & kết quả (15:00 – 16:30) ---
+
+[MÀN HÌNH] ml/train_price_model.py – cuộn qua cpu_features, gpu_features,
+build_features, make_model.
+
+[LỜI THOẠI]
+Dữ liệu gốc là chữ, ví dụ "Intel Core i9-14900HX", nên bước quan trọng là
+tạo đặc trưng: quy CPU về cấp từ 1 đến 5 kèm thế hệ, quy GPU RTX về dòng và
+cấp, tính độ phân giải theo megapixel, đánh dấu màn OLED, và mã hoá hãng
+cùng phân khúc bằng one-hot. Mô hình dự đoán logarit của giá vì giá phân
+bố lệch: đa số 15 đến 30 triệu, chỉ vài máy trên 100 triệu.
+
+[MÀN HÌNH] Mở ml/artifacts/metrics.json (hoặc slide bảng kết quả):
+   Đoán trung vị   MAE 10,1 tr   MAPE 43,9%   R² -0,08
+   Ridge           MAE  5,7 tr   MAPE 21,7%   R²  0,68
+   XGBoost         MAE  3,9 tr   MAPE 16,0%   R²  0,86   (5-fold CV R² 0,91)
+
+[LỜI THOẠI]
+Nhóm chia 80% dữ liệu để huấn luyện, 20% để kiểm tra, và so với hai mô hình
+cơ sở. Trên tập kiểm tra, XGBoost đạt R² 0,86, tức giải thích được 86% sự
+biến động giá, sai số trung bình khoảng 16%. Hồi quy tuyến tính chỉ đạt
+0,68. Các đặc trưng quan trọng nhất là RAM, bộ nhớ card đồ hoạ, SSD và cấp
+CPU, khá đúng với thực tế.
+
+[LỜI THOẠI]
+Để gắn nhãn cho từng máy, nhóm dùng kỹ thuật out-of-fold với 5-fold
+cross-validation: mỗi laptop được định giá bởi một mô hình chưa từng thấy
+nó khi huấn luyện, nhằm tránh rò rỉ dữ liệu. Nếu giá bán thấp hơn 90% giá
+dự đoán thì là "Giá tốt", cao hơn 115% thì là "Giá cao hơn thị trường", còn
+lại là "Giá hợp lý". Kết quả được ghi vào bảng price_predictions, backend
+JOIN vào API sản phẩm.
+
+--- 6.3 Demo (16:30 – 17:30) ---
+
+[MÀN HÌNH] Trang chủ: chỉ vào các nhãn dưới giá. Tick ô "🤖 Chỉ máy giá tốt
+(AI)".
+
+[LỜI THOẠI]
+Trên trang chủ, mỗi sản phẩm có nhãn màu: xanh là giá tốt, xám là hợp lý,
+cam là cao hơn thị trường. Tick vào ô "Chỉ máy giá tốt", danh sách chỉ còn
+những máy đang bán rẻ so với cấu hình.
+
+[MÀN HÌNH] Mở máy Dell Alienware 16 Aurora AC16250 (28.999.500 ₫) → khung
+"Định giá AI: Giá tốt – Giá hợp lý dự đoán: 34.743.084 ₫".
+
+[LỜI THOẠI]
+Ví dụ chiếc Dell Alienware 16 Aurora này bán 29 triệu, trong khi mô hình
+định giá khoảng 34,7 triệu dựa trên cấu hình, tức rẻ hơn khoảng 17%. Thông
+tin này giúp khách tự tin hơn khi quyết định mua.
+
+
+====================================================================
+PHẦN 7 – TRIỂN KHAI VERCEL + NEON                       17:30 – 18:45
+====================================================================
+[MÀN HÌNH] Vercel Dashboard: 2 project (backend, frontend); mở Settings →
+Environment Variables (giá trị Secret được ẩn).
+
+[LỜI THOẠI]
+Về triển khai, mã nguồn quản lý trên GitHub, mỗi thành viên làm việc trên
+nhánh riêng và gộp qua pull request. Website được host trên Vercel, gồm hai
+project từ cùng một repo.
+
+Project backend chạy Express dưới dạng serverless function. Chuỗi kết nối
+database và API key Gemini được lưu thành biến môi trường bí mật, không bao
+giờ đưa lên GitHub. Project frontend là web tĩnh, biến VITE_API_URL trỏ tới
+backend.
+
+[MÀN HÌNH] Mở <domain-backend>/api/health → {"ok":true}.
+
+[LỜI THOẠI]
+Database dùng Neon thay vì một CSDL nhúng, vì môi trường serverless có ổ đĩa
+tạm: dữ liệu đơn hàng và tài khoản phải nằm ở một nơi bền vững. Vector
+embedding và nhãn giá đã có sẵn trong Neon, nên Vercel chỉ việc đọc ra. Mỗi
+lần push code lên nhánh main, Vercel tự động build và triển khai lại.
+
+
+====================================================================
+PHẦN 8 – HẠN CHẾ, HƯỚNG PHÁT TRIỂN, KẾT                  18:45 – 20:00
+====================================================================
+[MÀN HÌNH] Slide hạn chế & hướng phát triển.
+
+[LỜI THOẠI]
+Nhóm cũng xin nêu các hạn chế hiện tại. Về bảo mật, mật khẩu chưa được băm
+và API quản trị chưa kiểm tra quyền phía server; bước tiếp theo là dùng
+bcrypt và JWT. Về dữ liệu, giá được quy đổi từ một bộ dữ liệu nước ngoài nên
+chưa phản ánh đúng thị trường Việt Nam. Mô hình XGBoost chỉ dựa trên thông
+số, chưa tính khuyến mãi hay độ bền. Gemini gói miễn phí có giới hạn số yêu
+cầu, nhóm đã xử lý bằng cơ chế thử lại và tìm kiếm dự phòng.
+
+Hướng phát triển: tích hợp cổng thanh toán, lưu giỏ hàng vào database, thu
+thập giá thị trường Việt Nam để huấn luyện lại mô hình, và cho trợ lý nhớ
+hội thoại dài hơn.
+
+[MÀN HÌNH] Quay lại trang chủ, mở khung "Tư vấn AI".
+
+[LỜI THOẠI]
+Tóm lại, UseYourMind là một website thương mại điện tử hoàn chỉnh với
+React, Express và PostgreSQL, được tăng cường bởi hai thành phần AI: trợ lý
+RAG giúp khách tìm đúng máy bằng ngôn ngữ tự nhiên mà không bịa thông tin,
+và mô hình XGBoost giúp khách biết máy nào đang có giá tốt.
+
+Cảm ơn thầy và các bạn đã theo dõi.
+
+=========================== HẾT ===========================
